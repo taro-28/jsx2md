@@ -6,7 +6,7 @@ Oxlint runs with all stable rules and nursery rules enabled:
 oxlint -D all -D nursery --type-aware --type-check .
 ```
 
-The `scripts/lint.mjs` wrapper keeps that command shape and adds explicit `-A` entries for rules that conflict with this repository's requirements:
+The `scripts/lint.mjs` wrapper first builds workspace declarations so type-aware linting works on a fresh clone, keeps that command shape, and adds explicit `-A` entries for rules that conflict with this repository's requirements:
 
 - Library packages require named exports, subpath exports, and JSX runtime namespaces.
 - Node-based CLI and repository scripts need Node built-ins, console output, process exit codes, and parent-directory imports.

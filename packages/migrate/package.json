@@ -23,7 +23,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --sourcemap --clean --tsconfig tsconfig.build.json",
+    "build": "rm -rf dist && tsup src/index.ts --format esm --dts --sourcemap --clean --tsconfig tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
