@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "ignore": ["packages/core/test/type-contract.tsx"],
+  "ignoreDependencies": [
+    "@jsx2md/cli",
+    "@jsx2md/github",
+    "@jsx2md/migrate",
+    "jsx2md",
+    "oxlint",
+    "oxlint-tsgolint",
+    "tsx"
+  ]
+}
