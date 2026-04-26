@@ -8,7 +8,16 @@
     "jsx",
     "markdown"
   ],
+  "homepage": "https://github.com/taro-28/jsx2md#readme",
+  "bugs": {
+    "url": "https://github.com/taro-28/jsx2md/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taro-28/jsx2md.git",
+    "directory": "packages/github"
+  },
   "files": [
     "dist",
     "README.md"

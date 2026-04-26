@@ -5,9 +5,18 @@
     "@jsx2md/cli",
     "@jsx2md/github",
     "@jsx2md/migrate",
-    "jsx2md",
     "oxlint",
     "oxlint-tsgolint",
     "tsx"
-  ]
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "docs/readme.tsx",
+        "examples/migrate.tsx",
+        "examples/pr-comment.tsx",
+        "examples/readme.tsx"
+      ]
+    }
+  }
 }

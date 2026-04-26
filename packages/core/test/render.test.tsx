@@ -49,7 +49,7 @@ describe("render", () => {
         </table>,
         { adapter: "gfm" },
       ),
-    ).toBe("| Name | Score |\n| --- | ---: |\n| Ada | 10 |\n");
+    ).toBe("| Name | Score |\n| ---- | ----: |\n| Ada  | 10    |\n");
   });
 
   it("renders code fences and raw markdown", () => {

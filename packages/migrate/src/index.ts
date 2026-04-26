@@ -44,7 +44,11 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
     source,
   };
   const body = tree.children.map((node) => blockToTsx(node, state, options)).join("\n");
-  const imports = ["/** @jsxImportSource jsx2md */", 'import { Doc, RawMarkdown } from "jsx2md";'];
+  const imports = [
+    "/** @jsxRuntime automatic */",
+    "/** @jsxImportSource jsx2md */",
+    'import { Doc, RawMarkdown } from "jsx2md";',
+  ];
 
   if (state.githubImports.size > 0) {
     imports.push(`import { ${[...state.githubImports].sort().join(", ")} } from "@jsx2md/github";`);
@@ -158,23 +162,56 @@ const thematicBreakToTsx = (_node: ThematicBreak): string => "<hr />";
 
 const tableToTsx = (node: Table, state: State): string => {
   const [head, ...body] = node.children;
-  const header = head === undefined ? "" : rowToTsx(head.children, "th", state);
-  const rows = body.map((row) => rowToTsx(row.children, "td", state)).join("\n");
+  const alignment = node.align ?? [];
+  const header =
+    head === undefined
+      ? ""
+      : rowToTsx({
+          alignment,
+          cellTag: "th",
+          cells: head.children,
+          state,
+        });
+  const rows = body
+    .map((row) =>
+      rowToTsx({
+        alignment,
+        cellTag: "td",
+        cells: row.children,
+        state,
+      }),
+    )
+    .join("\n");
   return `<table>\n  <thead>\n${indent(header, 4)}\n  </thead>\n  <tbody>\n${indent(
     rows,
     4,
   )}\n  </tbody>\n</table>`;
 };
 
-const rowToTsx = (
-  cells: readonly Table["children"][number]["children"][number][],
-  cellTag: "td" | "th",
-  state: State,
-): string =>
+interface RowToTsxOptions {
+  readonly alignment: readonly (string | null | undefined)[];
+  readonly cellTag: "td" | "th";
+  readonly cells: readonly Table["children"][number]["children"][number][];
+  readonly state: State;
+}
+
+const rowToTsx = ({ alignment, cellTag, cells, state }: RowToTsxOptions): string =>
   `<tr>\n${indent(
-    cells.map((cell) => wrap(cellTag, inlineNodesToTsx(cell.children, state))).join("\n"),
+    cells
+      .map((cell, index) =>
+        wrap(
+          `${cellTag}${alignAttribute(alignment[index])}`,
+          inlineNodesToTsx(cell.children, state),
+        ),
+      )
+      .join("\n"),
     2,
   )}\n</tr>`;
+
+const alignAttribute = (value: string | null | undefined): string =>
+  value === "left" || value === "center" || value === "right"
+    ? ` align=${quoteAttribute(value)}`
+    : "";
 
 const inlineNodesToTsx = (nodes: readonly PhrasingContent[], state: State): string =>
   nodes.map((node) => inlineNodeToTsx(node, state)).join("");

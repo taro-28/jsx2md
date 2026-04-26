@@ -3,5 +3,13 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["packages/*/test/**/*.ts", "packages/*/test/**/*.tsx", "vitest.config.ts"]
+  "include": [
+    "docs/**/*.ts",
+    "docs/**/*.tsx",
+    "examples/**/*.ts",
+    "examples/**/*.tsx",
+    "packages/*/test/**/*.ts",
+    "packages/*/test/**/*.tsx",
+    "vitest.config.ts"
+  ]
 }

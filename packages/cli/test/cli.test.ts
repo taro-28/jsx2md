@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkOutput, loadJsonFile, migrateFile } from "@jsx2md/cli";
+import { checkOutput, compareOutput, loadJsonFile, migrateFile } from "@jsx2md/cli";
 
 describe("CLI helpers", () => {
   it("loads JSON props", async () => {
@@ -20,6 +20,26 @@ describe("CLI helpers", () => {
 
     await expect(checkOutput("# Title\n", outputPath)).resolves.toBe(true);
     await expect(checkOutput("# Other\n", outputPath)).resolves.toBe(false);
+  });
+
+  it("returns a diff for output mismatches", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jsx2md-cli-"));
+    const outputPath = join(directory, "README.md");
+    await writeFile(outputPath, "# Title\n\nOld\n");
+
+    await expect(compareOutput("# Title\n\nNew\n", outputPath)).resolves.toEqual({
+      diff: [
+        `--- ${outputPath}`,
+        "+++ generated",
+        "@@ -1,3 +1,3 @@",
+        " # Title",
+        " ",
+        "-Old",
+        "+New",
+        "",
+      ].join("\n"),
+      matches: false,
+    });
   });
 
   it("migrates Markdown files", async () => {
