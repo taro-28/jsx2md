@@ -29,11 +29,11 @@ export type ElementType<Props extends object = Record<string, unknown>> = string
 
 export interface MarkdownElement {
   readonly [elementSymbol]: true;
-  readonly type: string | Component<Record<string, unknown>>;
+  readonly type: string | Component;
   readonly props: Readonly<Record<string, unknown>> & {
     readonly children?: MarkdownChildren;
   };
-  readonly key: string | number | null;
+  readonly key: string | number | undefined;
 }
 
 export interface ComponentContext {
@@ -63,7 +63,7 @@ export interface HeadingElementProps extends CommonProps {
   readonly id?: string;
 }
 
-export interface ParagraphProps extends CommonProps {}
+export type ParagraphProps = CommonProps;
 
 export interface ListProps extends CommonProps {
   readonly start?: number;
@@ -73,7 +73,7 @@ export interface ListItemProps extends CommonProps {
   readonly checked?: boolean;
 }
 
-export interface BlockquoteProps extends CommonProps {}
+export type BlockquoteProps = CommonProps;
 
 export interface CodeProps extends CommonProps {
   readonly lang?: string;

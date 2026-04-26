@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { renderEntry } from "../packages/cli/dist/index.js";
-import { migrateMarkdown } from "../packages/migrate/dist/index.js";
+import { migrateMarkdown } from "@jsx2md/migrate";
+import { renderEntry } from "@jsx2md/cli";
 
 const smokeRoot = new URL("../.tmp/", import.meta.url);
 await mkdir(smokeRoot, { recursive: true });
@@ -37,4 +37,4 @@ if (!migrated.code.includes("<TaskList>")) {
 }
 
 await readFile(entry, "utf8");
-console.log("Smoke tests passed.");
+process.stdout.write("Smoke tests passed.\n");

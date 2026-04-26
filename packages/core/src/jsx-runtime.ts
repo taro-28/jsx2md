@@ -1,5 +1,3 @@
-export { Fragment, createElement as jsx, createElement as jsxs } from "./runtime.js";
-export type { MarkdownElement as Element } from "./types.js";
 import type {
   BlockquoteProps,
   CodeProps,
@@ -8,16 +6,20 @@ import type {
   LinkProps,
   ListItemProps,
   ListProps,
+  MarkdownElement,
+  MarkdownNode,
   ParagraphProps,
   TableCellProps,
 } from "./types.js";
+export { Fragment, createElement as jsx, createElement as jsxs } from "./runtime.js";
+export type { MarkdownElement as Element };
 
 interface EmptyProps {
   readonly children?: never;
 }
 
 export namespace JSX {
-  export type Element = import("./types.js").MarkdownNode;
+  export type Element = MarkdownNode;
   export interface ElementChildrenAttribute {
     readonly children: unknown;
   }
@@ -25,6 +27,7 @@ export namespace JSX {
     readonly key?: string | number;
   }
   export interface IntrinsicElements {
+    // oxlint-disable id-length -- JSX intrinsic names must match Markdown and HTML tag names.
     readonly a: LinkProps;
     readonly blockquote: BlockquoteProps;
     readonly br: EmptyProps;
@@ -51,5 +54,6 @@ export namespace JSX {
     readonly thead: ParagraphProps;
     readonly tr: ParagraphProps;
     readonly ul: ListProps;
+    // oxlint-enable id-length
   }
 }

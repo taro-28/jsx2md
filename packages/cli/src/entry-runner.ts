@@ -1,6 +1,36 @@
+import { type AdapterName, type MarkdownNode, render } from "jsx2md";
 import { pathToFileURL } from "node:url";
-import { render } from "jsx2md";
-import type { AdapterName, MarkdownNode } from "jsx2md";
+
+const isAdapterName = (value: string): value is AdapterName =>
+  value === "markdown" || value === "gfm" || value === "github";
+
+const resolveDefaultExport = async (
+  exportedValue: unknown,
+  value: unknown,
+): Promise<MarkdownNode> => {
+  if (typeof exportedValue !== "function") {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- render() validates unsupported nodes as empty output at runtime.
+    return exportedValue as MarkdownNode;
+  }
+
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- CLI function entries intentionally accept caller-provided JSON props.
+  const entryFunction = exportedValue as (props: unknown) => MarkdownNode | Promise<MarkdownNode>;
+  const node = await entryFunction(value);
+  return node;
+};
+
+const unwrapDefault = (value: unknown): unknown => {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "default" in value &&
+    Object.keys(value).length === 1
+  ) {
+    return (value as { readonly default?: unknown }).default;
+  }
+
+  return value;
+};
 
 const [entry, adapter, encodedProps] = process.argv.slice(2);
 
@@ -16,40 +46,15 @@ const props =
   encodedProps === "-"
     ? undefined
     : (JSON.parse(Buffer.from(encodedProps, "base64url").toString("utf8")) as unknown);
-const loaded = (await import(pathToFileURL(entry).href)) as {
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- TSX entries are arbitrary modules and the CLI only reads their default export.
+const loadedModule = (await import(pathToFileURL(entry).href)) as {
   readonly default?: unknown;
 };
-const exported = unwrapDefault(loaded.default);
+const defaultExport = unwrapDefault(loadedModule.default);
 
-if (exported === undefined) {
+if (defaultExport === undefined) {
   throw new Error(`Entry ${entry} does not have a default export.`);
 }
 
-const node = await resolveDefaultExport(exported, props);
+const node = await resolveDefaultExport(defaultExport, props);
 process.stdout.write(render(node, { adapter }));
-
-function isAdapterName(value: string): value is AdapterName {
-  return value === "markdown" || value === "gfm" || value === "github";
-}
-
-async function resolveDefaultExport(exported: unknown, value: unknown): Promise<MarkdownNode> {
-  if (typeof exported !== "function") {
-    return exported as MarkdownNode;
-  }
-
-  const entryFunction = exported as (props: unknown) => MarkdownNode | Promise<MarkdownNode>;
-  return entryFunction(value);
-}
-
-function unwrapDefault(value: unknown): unknown {
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    "default" in value &&
-    Object.keys(value).length === 1
-  ) {
-    return (value as { readonly default?: unknown }).default;
-  }
-
-  return value;
-}

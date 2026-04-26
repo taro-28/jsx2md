@@ -1,9 +1,6 @@
 import type {
   Code,
-  Content,
-  DefinitionContent,
   Heading,
-  Html,
   Image,
   InlineCode,
   Link,
@@ -11,14 +8,15 @@ import type {
   ListItem,
   Paragraph,
   PhrasingContent,
-  Root,
-  Table,
+  RootContent,
   Text,
   ThematicBreak,
 } from "mdast";
-import { toMarkdown } from "mdast-util-to-markdown";
+import { indent, quoteAttribute, rawToTsx, unknownToTsx, wrap } from "./format.js";
+import type { MigrationState } from "./state.js";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
+import { tableToTsx } from "./table.js";
 import { unified } from "unified";
 
 export interface MigrateOptions {
@@ -30,15 +28,9 @@ export interface MigrateResult {
   readonly diagnostics: readonly string[];
 }
 
-interface State {
-  readonly githubImports: Set<string>;
-  readonly diagnostics: string[];
-  readonly source: string;
-}
-
 export const migrateMarkdown = (source: string, options: MigrateOptions = {}): MigrateResult => {
-  const tree = unified().use(remarkParse).use(remarkGfm).parse(source) as Root;
-  const state: State = {
+  const tree = unified().use(remarkParse).use(remarkGfm).parse(source);
+  const state: MigrationState = {
     diagnostics: [],
     githubImports: new Set(),
     source,
@@ -51,7 +43,9 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
   ];
 
   if (state.githubImports.size > 0) {
-    imports.push(`import { ${[...state.githubImports].sort().join(", ")} } from "@jsx2md/github";`);
+    imports.push(
+      `import { ${[...state.githubImports].toSorted().join(", ")} } from "@jsx2md/github";`,
+    );
   }
 
   return {
@@ -60,7 +54,13 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
   };
 };
 
-const blockToTsx = (node: Content, state: State, options: MigrateOptions): string => {
+const blockToTsx = (node: RootContent, state: MigrationState, options: MigrateOptions): string =>
+  simpleBlockToTsx(node, state) ??
+  containerBlockToTsx(node, state, options) ??
+  githubBlockToTsx(node, state, options) ??
+  unknownToTsx(node, state);
+
+const simpleBlockToTsx = (node: RootContent, state: MigrationState): string | undefined => {
   if (node.type === "heading") {
     return headingToTsx(node, state);
   }
@@ -69,6 +69,22 @@ const blockToTsx = (node: Content, state: State, options: MigrateOptions): strin
     return paragraphToTsx(node, state);
   }
 
+  if (node.type === "code") {
+    return codeToTsx(node);
+  }
+
+  if (node.type === "thematicBreak") {
+    return thematicBreakToTsx(node);
+  }
+
+  return undefined;
+};
+
+const containerBlockToTsx = (
+  node: RootContent,
+  state: MigrationState,
+  options: MigrateOptions,
+): string | undefined => {
   if (node.type === "list") {
     return listToTsx(node, state, options);
   }
@@ -80,39 +96,39 @@ const blockToTsx = (node: Content, state: State, options: MigrateOptions): strin
     );
   }
 
-  if (node.type === "code") {
-    return codeToTsx(node);
+  if (node.type === "table") {
+    return tableToTsx({ api: tableApi, node, state });
   }
 
-  if (node.type === "thematicBreak") {
-    return thematicBreakToTsx(node);
-  }
+  return undefined;
+};
 
+const githubBlockToTsx = (
+  node: RootContent,
+  state: MigrationState,
+  options: MigrateOptions,
+): string | undefined => {
   if (node.type === "html") {
     return rawToTsx(node, state, "HTML block");
   }
 
-  if (node.type === "table") {
-    return tableToTsx(node, state);
-  }
-
   if (node.type === "footnoteDefinition") {
     state.githubImports.add("Footnote");
-    return `<Footnote id=${quoteAttribute(String(node.identifier))}>${node.children
+    return `<Footnote id=${quoteAttribute(node.identifier)}>${node.children
       .map((child) => blockToTsx(child, state, options))
       .join("")}</Footnote>`;
   }
 
-  return unknownToTsx(node, state);
+  return undefined;
 };
 
-const headingToTsx = (node: Heading, state: State): string =>
+const headingToTsx = (node: Heading, state: MigrationState): string =>
   wrap(`h${String(node.depth)}`, inlineNodesToTsx(node.children, state));
 
-const paragraphToTsx = (node: Paragraph, state: State): string =>
+const paragraphToTsx = (node: Paragraph, state: MigrationState): string =>
   wrap("p", inlineNodesToTsx(node.children, state));
 
-const listToTsx = (node: List, state: State, options: MigrateOptions): string => {
+const listToTsx = (node: List, state: MigrationState, options: MigrateOptions): string => {
   const hasTasks = node.children.some((item) => item.checked !== null);
   if (hasTasks && options.adapter === "github") {
     state.githubImports.add("TaskItem");
@@ -141,7 +157,11 @@ const listToTsx = (node: List, state: State, options: MigrateOptions): string =>
   )}\n</${tag}>`;
 };
 
-const listItemChildrenToTsx = (item: ListItem, state: State, options: MigrateOptions): string =>
+const listItemChildrenToTsx = (
+  item: ListItem,
+  state: MigrationState,
+  options: MigrateOptions,
+): string =>
   item.children
     .map((child) => {
       if (child.type === "paragraph") {
@@ -160,63 +180,17 @@ const codeToTsx = (node: Code): string => {
 
 const thematicBreakToTsx = (_node: ThematicBreak): string => "<hr />";
 
-const tableToTsx = (node: Table, state: State): string => {
-  const [head, ...body] = node.children;
-  const alignment = node.align ?? [];
-  const header =
-    head === undefined
-      ? ""
-      : rowToTsx({
-          alignment,
-          cellTag: "th",
-          cells: head.children,
-          state,
-        });
-  const rows = body
-    .map((row) =>
-      rowToTsx({
-        alignment,
-        cellTag: "td",
-        cells: row.children,
-        state,
-      }),
-    )
-    .join("\n");
-  return `<table>\n  <thead>\n${indent(header, 4)}\n  </thead>\n  <tbody>\n${indent(
-    rows,
-    4,
-  )}\n  </tbody>\n</table>`;
-};
-
-interface RowToTsxOptions {
-  readonly alignment: readonly (string | null | undefined)[];
-  readonly cellTag: "td" | "th";
-  readonly cells: readonly Table["children"][number]["children"][number][];
-  readonly state: State;
-}
-
-const rowToTsx = ({ alignment, cellTag, cells, state }: RowToTsxOptions): string =>
-  `<tr>\n${indent(
-    cells
-      .map((cell, index) =>
-        wrap(
-          `${cellTag}${alignAttribute(alignment[index])}`,
-          inlineNodesToTsx(cell.children, state),
-        ),
-      )
-      .join("\n"),
-    2,
-  )}\n</tr>`;
-
-const alignAttribute = (value: string | null | undefined): string =>
-  value === "left" || value === "center" || value === "right"
-    ? ` align=${quoteAttribute(value)}`
-    : "";
-
-const inlineNodesToTsx = (nodes: readonly PhrasingContent[], state: State): string =>
+const inlineNodesToTsx = (nodes: readonly PhrasingContent[], state: MigrationState): string =>
   nodes.map((node) => inlineNodeToTsx(node, state)).join("");
 
-const inlineNodeToTsx = (node: PhrasingContent, state: State): string => {
+const inlineNodeToTsx = (node: PhrasingContent, state: MigrationState): string =>
+  textInlineToTsx(node) ??
+  phrasingInlineToTsx(node, state) ??
+  resourceInlineToTsx(node, state) ??
+  githubInlineToTsx(node, state) ??
+  unknownToTsx(node, state);
+
+const textInlineToTsx = (node: PhrasingContent): string | undefined => {
   if (node.type === "text") {
     return textToTsx(node);
   }
@@ -225,6 +199,10 @@ const inlineNodeToTsx = (node: PhrasingContent, state: State): string => {
     return inlineCodeToTsx(node);
   }
 
+  return undefined;
+};
+
+const phrasingInlineToTsx = (node: PhrasingContent, state: MigrationState): string | undefined => {
   if (node.type === "emphasis") {
     return wrap("em", inlineNodesToTsx(node.children, state));
   }
@@ -237,6 +215,10 @@ const inlineNodeToTsx = (node: PhrasingContent, state: State): string => {
     return wrap("del", inlineNodesToTsx(node.children, state));
   }
 
+  return undefined;
+};
+
+const resourceInlineToTsx = (node: PhrasingContent, state: MigrationState): string | undefined => {
   if (node.type === "link") {
     return linkToTsx(node, state);
   }
@@ -249,16 +231,20 @@ const inlineNodeToTsx = (node: PhrasingContent, state: State): string => {
     return "<br />";
   }
 
+  return undefined;
+};
+
+const githubInlineToTsx = (node: PhrasingContent, state: MigrationState): string | undefined => {
   if (node.type === "html") {
     return rawToTsx(node, state, "inline HTML");
   }
 
   if (node.type === "footnoteReference") {
     state.githubImports.add("FootnoteRef");
-    return `<FootnoteRef id=${quoteAttribute(String(node.identifier))} />`;
+    return `<FootnoteRef id=${quoteAttribute(node.identifier)} />`;
   }
 
-  return unknownToTsx(node, state);
+  return undefined;
 };
 
 const textToTsx = (node: Text): string => `{${JSON.stringify(node.value)}}`;
@@ -266,7 +252,7 @@ const textToTsx = (node: Text): string => `{${JSON.stringify(node.value)}}`;
 const inlineCodeToTsx = (node: InlineCode): string =>
   `<code>{${JSON.stringify(node.value)}}</code>`;
 
-const linkToTsx = (node: Link, state: State): string => {
+const linkToTsx = (node: Link, state: MigrationState): string => {
   const title =
     node.title === null || node.title === undefined ? "" : ` title=${quoteAttribute(node.title)}`;
   return `<a href=${quoteAttribute(node.url)}${title}>${inlineNodesToTsx(
@@ -281,38 +267,6 @@ const imageToTsx = (node: Image): string => {
   return `<img src=${quoteAttribute(node.url)} alt=${quoteAttribute(node.alt ?? "")}${title} />`;
 };
 
-const rawToTsx = (node: Html, state: State, label: string): string => {
-  state.diagnostics.push(`Preserved ${label} as RawMarkdown.`);
-  return `<RawMarkdown>{${JSON.stringify(rawSource(node, state))}}</RawMarkdown>`;
-};
-
-const unknownToTsx = (
-  node: Content | PhrasingContent | DefinitionContent,
-  state: State,
-): string => {
-  state.diagnostics.push(`Preserved unsupported ${node.type} node as RawMarkdown.`);
-  return `<RawMarkdown>{${JSON.stringify(rawSource(node, state))}}</RawMarkdown>`;
-};
-
-const rawSource = (node: Content | PhrasingContent | DefinitionContent, state: State): string => {
-  const start = node.position?.start.offset;
-  const end = node.position?.end.offset;
-  if (typeof start === "number" && typeof end === "number" && start >= 0 && end >= start) {
-    return state.source.slice(start, end);
-  }
-
-  return toMarkdown(node);
-};
-
-const wrap = (tag: string, body: string): string =>
-  body.length === 0 ? `<${tag} />` : `<${tag}>${body}</${tag}>`;
-
-const quoteAttribute = (value: string): string => JSON.stringify(value);
-
-const indent = (value: string, spaces: number): string => {
-  const prefix = " ".repeat(spaces);
-  return value
-    .split("\n")
-    .map((line) => (line.length === 0 ? line : `${prefix}${line}`))
-    .join("\n");
+const tableApi = {
+  inlineNodesToTsx,
 };

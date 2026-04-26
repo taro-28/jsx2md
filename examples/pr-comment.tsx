@@ -1,8 +1,7 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { Doc, Section } from "jsx2md";
 import { Alert, Details, TaskItem, TaskList } from "@jsx2md/github";
-import type { MarkdownNode } from "jsx2md";
+import { Doc, type MarkdownNode, Section } from "jsx2md";
 
 export interface PullRequestCommentProps {
   readonly changedFiles: readonly string[];
@@ -32,4 +31,5 @@ const PullRequestComment = (props: PullRequestCommentProps): MarkdownNode => (
   </Doc>
 );
 
+// oxlint-disable-next-line import/no-default-export -- TSX entries are loaded by the CLI through their default export.
 export default PullRequestComment;

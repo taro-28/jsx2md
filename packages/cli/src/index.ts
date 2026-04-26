@@ -1,10 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { resolve } from "node:path";
-import { promisify } from "node:util";
-import { migrateMarkdown } from "@jsx2md/migrate";
 import type { AdapterName } from "jsx2md";
+import { execFile } from "node:child_process";
+import { migrateMarkdown } from "@jsx2md/migrate";
+import { promisify } from "node:util";
+import { resolve } from "node:path";
 
+// oxlint-disable-next-line typescript/strict-void-return -- Node's execFile overload is compatible with util.promisify at runtime.
 const execFileAsync = promisify(execFile);
 
 export interface RenderEntryOptions {
@@ -25,7 +26,7 @@ export const renderEntry = async (
   entry: string,
   options: RenderEntryOptions = {},
 ): Promise<string> => {
-  const runner = new URL("./entry-runner.js", import.meta.url);
+  const runner = new URL("entry-runner.js", import.meta.url);
   const resolvedEntry = resolve(entry);
   const props = options.props === undefined ? "-" : encodeProps(options.props);
 
@@ -108,40 +109,69 @@ const formatUnifiedDiff = ({
 }: UnifiedDiffOptions): string => {
   const expectedLines = diffLines(expected);
   const actualLines = diffLines(actual);
+  const window = diffWindow(expectedLines, actualLines);
+  const lines = [
+    ...diffHeader(expectedLabel, actualLabel, window),
+    ...diffBody(expectedLines, actualLines, window),
+  ];
+
+  return `${lines.join("\n")}\n`;
+};
+
+interface DiffWindow {
+  readonly actualChangeEnd: number;
+  readonly actualContextEnd: number;
+  readonly contextStart: number;
+  readonly expectedChangeEnd: number;
+  readonly expectedContextEnd: number;
+  readonly prefixLength: number;
+}
+
+const diffWindow = (
+  expectedLines: readonly string[],
+  actualLines: readonly string[],
+): DiffWindow => {
   const prefixLength = commonPrefixLength(expectedLines, actualLines);
   const suffixLength = commonSuffixLength(expectedLines, actualLines, prefixLength);
   const contextLength = 3;
   const expectedChangeEnd = expectedLines.length - suffixLength;
   const actualChangeEnd = actualLines.length - suffixLength;
-  const contextStart = Math.max(0, prefixLength - contextLength);
-  const expectedContextEnd = Math.min(expectedLines.length, expectedChangeEnd + contextLength);
-  const actualContextEnd = Math.min(actualLines.length, actualChangeEnd + contextLength);
-  const lines = [
-    `--- ${expectedLabel}`,
-    `+++ ${actualLabel}`,
-    `@@ -${String(contextStart + 1)},${String(
-      expectedContextEnd - contextStart,
-    )} +${String(contextStart + 1)},${String(actualContextEnd - contextStart)} @@`,
-  ];
-
-  for (const line of expectedLines.slice(contextStart, prefixLength)) {
-    lines.push(` ${line}`);
-  }
-
-  for (const line of expectedLines.slice(prefixLength, expectedChangeEnd)) {
-    lines.push(`-${line}`);
-  }
-
-  for (const line of actualLines.slice(prefixLength, actualChangeEnd)) {
-    lines.push(`+${line}`);
-  }
-
-  for (const line of expectedLines.slice(expectedChangeEnd, expectedContextEnd)) {
-    lines.push(` ${line}`);
-  }
-
-  return `${lines.join("\n")}\n`;
+  return {
+    actualChangeEnd,
+    actualContextEnd: Math.min(actualLines.length, actualChangeEnd + contextLength),
+    contextStart: Math.max(0, prefixLength - contextLength),
+    expectedChangeEnd,
+    expectedContextEnd: Math.min(expectedLines.length, expectedChangeEnd + contextLength),
+    prefixLength,
+  };
 };
+
+const diffHeader = (
+  expectedLabel: string,
+  actualLabel: string,
+  window: DiffWindow,
+): readonly string[] => [
+  `--- ${expectedLabel}`,
+  `+++ ${actualLabel}`,
+  `@@ -${String(window.contextStart + 1)},${String(
+    window.expectedContextEnd - window.contextStart,
+  )} +${String(window.contextStart + 1)},${String(
+    window.actualContextEnd - window.contextStart,
+  )} @@`,
+];
+
+const diffBody = (
+  expectedLines: readonly string[],
+  actualLines: readonly string[],
+  window: DiffWindow,
+): readonly string[] => [
+  ...expectedLines.slice(window.contextStart, window.prefixLength).map((line) => ` ${line}`),
+  ...expectedLines.slice(window.prefixLength, window.expectedChangeEnd).map((line) => `-${line}`),
+  ...actualLines.slice(window.prefixLength, window.actualChangeEnd).map((line) => `+${line}`),
+  ...expectedLines
+    .slice(window.expectedChangeEnd, window.expectedContextEnd)
+    .map((line) => ` ${line}`),
+];
 
 const diffLines = (value: string): readonly string[] => {
   if (value.length === 0) {
@@ -151,7 +181,7 @@ const diffLines = (value: string): readonly string[] => {
   const hasTrailingLineBreak = value.endsWith("\n");
   const content = hasTrailingLineBreak ? value.slice(0, -1) : value;
   const lines = content.length === 0 ? [] : content.split("\n");
-  return hasTrailingLineBreak ? lines : [...lines, "\\ No newline at end of file"];
+  return hasTrailingLineBreak ? lines : [...lines, String.raw`\ No newline at end of file`];
 };
 
 const commonPrefixLength = (left: readonly string[], right: readonly string[]): number => {

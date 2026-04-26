@@ -1,9 +1,7 @@
 /** @jsxImportSource jsx2md */
-import { describe, expect, it } from "vitest";
-import { Doc, render } from "jsx2md";
 import {
-  Anchor,
   Alert,
+  Anchor,
   Color,
   CommitRef,
   Details,
@@ -12,15 +10,17 @@ import {
   FootnoteRef,
   IssueRef,
   Kbd,
-  Mermaid,
   Mention,
+  Mermaid,
   PullRef,
   Suggestion,
   TaskItem,
   TaskList,
 } from "@jsx2md/github";
+import { Doc, render } from "jsx2md";
+import { describe, expect, it } from "vitest";
 
-describe("GitHub components", () => {
+describe("GitHub block components", () => {
   it("renders GitHub alerts", () => {
     expect(
       render(
@@ -65,13 +65,17 @@ describe("GitHub components", () => {
       ].join("\n"),
     );
   });
+});
 
+describe("GitHub diagram components", () => {
   it("renders diagrams", () => {
     expect(render(<Mermaid>{"graph TD\nA-->B"}</Mermaid>, { adapter: "github" })).toBe(
       "```mermaid\ngraph TD\nA-->B\n```\n",
     );
   });
+});
 
+describe("GitHub inline components", () => {
   it("renders inline GitHub references", () => {
     expect(
       render(

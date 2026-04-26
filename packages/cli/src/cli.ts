@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { Command } from "commander";
-import type { AdapterName } from "jsx2md";
 import { compareOutput, loadJsonFile, migrateFile, renderEntry, writeOutput } from "./index.js";
+import type { AdapterName } from "jsx2md";
+import { Command } from "commander";
 
 interface RenderCommandOptions {
   readonly adapter?: AdapterName;
@@ -80,8 +80,10 @@ program
     }
   });
 
-program.parseAsync().catch((error: unknown) => {
+try {
+  await program.parseAsync();
+} catch (error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`${message}\n`);
   process.exitCode = 1;
-});
+}

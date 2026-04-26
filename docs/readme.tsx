@@ -1,8 +1,7 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { Doc, RawMarkdown, Section } from "jsx2md";
+import { Doc, type MarkdownNode, RawMarkdown, Section } from "jsx2md";
 import { Alert } from "@jsx2md/github";
-import type { MarkdownNode } from "jsx2md";
 
 const shell = (value: string): MarkdownNode => <pre lang="sh">{value}</pre>;
 const tsx = (value: string): MarkdownNode => <pre lang="tsx">{value}</pre>;
@@ -14,6 +13,7 @@ const packages = [
   ["@jsx2md/cli", "The `jsx2md` command for render, check, and migrate workflows."],
 ];
 
+// oxlint-disable-next-line import/no-default-export -- TSX entries are loaded by the CLI through their default export.
 export default (
   <Doc>
     <Section title="jsx2md">

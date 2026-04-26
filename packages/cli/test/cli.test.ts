@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 import { checkOutput, compareOutput, loadJsonFile, migrateFile } from "@jsx2md/cli";
+import { describe, expect, it } from "vitest";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 describe("CLI helpers", () => {
   it("loads JSON props", async () => {

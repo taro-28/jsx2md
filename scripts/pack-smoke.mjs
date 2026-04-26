@@ -1,5 +1,5 @@
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { mkdir, readdir, rm } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const packDirectory = new URL(".tmp/packs/", root);
@@ -27,11 +27,11 @@ const packages = [
   },
 ];
 
-await rm(packDirectory, { force: true, recursive: true });
-await mkdir(packDirectory, { recursive: true });
+rmSync(packDirectory, { force: true, recursive: true });
+mkdirSync(packDirectory, { recursive: true });
 
 for (const packageInfo of packages) {
-  const before = new Set(await readdir(packDirectory));
+  const before = new Set(readdirSync(packDirectory));
   const result = spawnSync(
     "pnpm",
     ["--dir", packageInfo.directory, "pack", "--pack-destination", packDirectory.pathname],
@@ -48,7 +48,7 @@ for (const packageInfo of packages) {
     throw new Error(`Failed to pack ${packageInfo.name}.`);
   }
 
-  const after = await readdir(packDirectory);
+  const after = readdirSync(packDirectory);
   const packed = after.find((file) => !before.has(file) && file.endsWith(".tgz"));
   if (packed === undefined) {
     throw new Error(`Pack smoke test did not produce a tarball for ${packageInfo.name}.`);
@@ -72,4 +72,4 @@ for (const packageInfo of packages) {
   }
 }
 
-console.log(`Packed ${packages.length} packages into ${packDirectory.pathname}`);
+process.stdout.write(`Packed ${packages.length} packages into ${packDirectory.pathname}\n`);

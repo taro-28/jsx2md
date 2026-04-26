@@ -1,4 +1,3 @@
-import { createElement } from "./runtime.js";
 import type {
   AutoHeadingProps,
   CommonProps,
@@ -6,6 +5,7 @@ import type {
   RawMarkdownProps,
   SectionProps,
 } from "./types.js";
+import { createElement } from "./runtime.js";
 
 export const Doc: Component<CommonProps> = ({ children }) => createElement("doc", { children });
 

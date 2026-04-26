@@ -2,6 +2,7 @@
 /** @jsxImportSource jsx2md */
 import { Doc, Section } from "jsx2md";
 
+// oxlint-disable-next-line import/no-default-export -- TSX entries are loaded by the CLI through their default export.
 export default (
   <Doc>
     <Section title="Example Project">

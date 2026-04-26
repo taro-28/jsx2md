@@ -1,27 +1,28 @@
-import { adapterFromName } from "./adapters.js";
+import type { ComponentContext, MarkdownElement, MarkdownNode, RenderOptions } from "./types.js";
 import {
-  codeFence,
-  escapeInline,
-  escapeLinkDestination,
-  escapeTableCell,
-  inlineCode,
-} from "./escape.js";
+  type RenderContext,
+  type RenderMode,
+  childrenToArray,
+  incrementHeading,
+  isHeadingType,
+  isMarkdownNodeArray,
+  joinBlocks,
+  markdownProp,
+  requireFeature,
+  stringProp,
+} from "./render-shared.js";
+import { codeFence, escapeInline, escapeLinkDestination, inlineCode } from "./escape.js";
+import { adapterFromName } from "./adapters.js";
 import { isElement } from "./runtime.js";
-import type {
-  Adapter,
-  AdapterFeature,
-  ComponentContext,
-  MarkdownElement,
-  MarkdownNode,
-  RenderOptions,
-} from "./types.js";
+import { renderBlocks as renderBlocksWithApi } from "./render-blocks.js";
+import { renderList } from "./render-list.js";
+import { renderTable } from "./render-table.js";
 
-interface RenderContext {
-  readonly adapter: Adapter;
-  readonly headingLevel: number;
-}
-
-type RenderMode = "block" | "inline";
+type ElementRenderer = (
+  element: MarkdownElement,
+  context: RenderContext,
+  mode: RenderMode,
+) => string;
 
 export const render = (node: MarkdownNode, options: RenderOptions = {}): string => {
   const adapter =
@@ -39,7 +40,7 @@ const renderInline = (node: MarkdownNode, context: RenderContext): string =>
   renderNode(node, context, "inline");
 
 const renderNode = (node: MarkdownNode, context: RenderContext, mode: RenderMode): string => {
-  if (node === null || node === undefined || node === false || node === true) {
+  if (isEmptyNode(node)) {
     return "";
   }
 
@@ -47,7 +48,15 @@ const renderNode = (node: MarkdownNode, context: RenderContext, mode: RenderMode
     return escapeInline(String(node));
   }
 
-  if (Array.isArray(node)) {
+  return renderCompositeNode(node, context, mode);
+};
+
+const renderCompositeNode = (
+  node: MarkdownNode,
+  context: RenderContext,
+  mode: RenderMode,
+): string => {
+  if (isMarkdownNodeArray(node)) {
     return mode === "block"
       ? renderBlocks(node, context)
       : node.map((child) => renderInline(child, context)).join("");
@@ -58,8 +67,7 @@ const renderNode = (node: MarkdownNode, context: RenderContext, mode: RenderMode
   }
 
   if (typeof node.type === "function") {
-    const nextNode = node.type(node.props, toComponentContext(context));
-    return renderNode(nextNode, context, mode);
+    return renderNode(node.type(node.props, toComponentContext(context)), context, mode);
   }
 
   return renderElement(node, context, mode);
@@ -70,122 +78,112 @@ const renderElement = (
   context: RenderContext,
   mode: RenderMode,
 ): string => {
-  const type = element.type;
-  const props = element.props;
-  const children = props.children;
-
-  if (type === "raw") {
-    return String(children ?? "");
+  const { type } = element;
+  if (typeof type !== "string") {
+    return renderInline(element.props.children, context);
   }
 
-  if (type === "doc" || type === "fragment") {
-    return mode === "block"
-      ? renderBlocks(childrenToArray(children), context)
-      : renderInline(childrenToArray(children), context);
-  }
+  const renderer = elementRenderers[type] ?? headingRenderer(type);
+  return renderer === undefined
+    ? renderInline(element.props.children, context)
+    : renderer(element, context, mode);
+};
 
-  if (type === "section") {
-    const title = "title" in props ? props["title"] : undefined;
-    const titleOutput =
-      title === undefined
-        ? ""
-        : renderHeading(title as MarkdownNode, context.headingLevel, context);
-    const sectionContext = incrementHeading(context);
-    const body = renderBlocks(childrenToArray(children), sectionContext);
-    return joinBlocks([titleOutput, body]);
-  }
+const headingRenderer = (type: string): ElementRenderer | undefined =>
+  isHeadingType(type) ? renderFixedHeading : undefined;
 
-  if (type === "heading-auto") {
-    const level =
-      "level" in props && typeof props["level"] === "number"
-        ? props["level"]
-        : context.headingLevel;
-    return renderHeading(children, level, context);
-  }
+const renderRaw = (element: MarkdownElement, context: RenderContext): string => {
+  const { children } = element.props;
+  return typeof children === "string" ? children : rawText(children, context);
+};
 
-  if (typeof type === "string" && isHeadingType(type)) {
-    return renderHeading(children, Number(type.slice(1)), context);
-  }
+const renderContainer = (
+  element: MarkdownElement,
+  context: RenderContext,
+  mode: RenderMode,
+): string =>
+  mode === "block"
+    ? renderBlocks(childrenToArray(element.props.children), context)
+    : renderInline(childrenToArray(element.props.children), context);
 
-  if (type === "p") {
-    return renderInline(children, context);
-  }
+const renderSection = (element: MarkdownElement, context: RenderContext): string => {
+  const title = markdownProp(element.props, "title");
+  const titleOutput =
+    title === undefined ? "" : renderHeading(title, context.headingLevel, context);
+  const body = renderBlocks(childrenToArray(element.props.children), incrementHeading(context));
+  return joinBlocks([titleOutput, body]);
+};
 
-  if (type === "strong") {
-    return `**${renderInline(children, context)}**`;
-  }
+const renderAutoHeading = (element: MarkdownElement, context: RenderContext): string => {
+  const level = numericProp(element.props, "level") ?? context.headingLevel;
+  return renderHeading(element.props.children, level, context);
+};
 
-  if (type === "em") {
-    return `_${renderInline(children, context)}_`;
-  }
+const renderFixedHeading = (element: MarkdownElement, context: RenderContext): string =>
+  renderHeading(element.props.children, headingLevelFromElement(element), context);
 
-  if (type === "del") {
-    requireFeature(context, "gfm", "del");
-    return `~~${renderInline(children, context)}~~`;
-  }
+const renderParagraph = (element: MarkdownElement, context: RenderContext): string =>
+  renderInline(element.props.children, context);
 
-  if (type === "br") {
-    return mode === "inline" ? "  \n" : "";
-  }
+const renderStrong = (element: MarkdownElement, context: RenderContext): string =>
+  `**${renderInline(element.props.children, context)}**`;
 
-  if (type === "hr") {
-    return "---";
-  }
+const renderEmphasis = (element: MarkdownElement, context: RenderContext): string =>
+  `_${renderInline(element.props.children, context)}_`;
 
-  if (type === "blockquote") {
-    const quote = renderBlocks(childrenToArray(children), context);
-    return quote
-      .split("\n")
-      .map((line) => (line.length === 0 ? ">" : `> ${line}`))
-      .join("\n");
-  }
+const renderDelete = (element: MarkdownElement, context: RenderContext): string => {
+  requireFeature(context, "gfm", "del");
+  return `~~${renderInline(element.props.children, context)}~~`;
+};
 
-  if (type === "ul" || type === "ol") {
-    return renderList(element, context, type === "ol");
-  }
+const renderBreak = (
+  _element: MarkdownElement,
+  _context: RenderContext,
+  mode: RenderMode,
+): string => (mode === "inline" ? "  \n" : "");
 
-  if (type === "li") {
-    return renderBlocks(childrenToArray(children), context);
-  }
+const renderRule = (): string => "---";
 
-  if (type === "code") {
-    const value = rawText(children);
-    return inlineCode(value);
-  }
+const renderBlockquote = (element: MarkdownElement, context: RenderContext): string =>
+  renderBlocks(childrenToArray(element.props.children), context)
+    .split("\n")
+    .map((line) => (line.length === 0 ? ">" : `> ${line}`))
+    .join("\n");
 
-  if (type === "pre") {
-    const language = stringProp(props, "lang") ?? stringProp(props, "language");
-    return codeFence(rawText(children), language);
-  }
+const renderUnorderedList = (element: MarkdownElement, context: RenderContext): string =>
+  renderList({ api: renderApi, context, element, ordered: false });
 
-  if (type === "a") {
-    const href = escapeLinkDestination(stringProp(props, "href") ?? "");
-    const title = stringProp(props, "title");
-    const titlePart = title === undefined ? "" : ` ${JSON.stringify(title)}`;
-    return `[${renderInline(children, context)}](${href}${titlePart})`;
-  }
+const renderOrderedList = (element: MarkdownElement, context: RenderContext): string =>
+  renderList({ api: renderApi, context, element, ordered: true });
 
-  if (type === "img") {
-    const source = escapeLinkDestination(stringProp(props, "src") ?? "");
-    const alt = escapeInline(stringProp(props, "alt") ?? "");
-    const title = stringProp(props, "title");
-    const titlePart = title === undefined ? "" : ` ${JSON.stringify(title)}`;
-    return `![${alt}](${source}${titlePart})`;
-  }
+const renderListItem = (element: MarkdownElement, context: RenderContext): string =>
+  renderBlocks(childrenToArray(element.props.children), context);
 
-  if (type === "table") {
-    return renderTable(element, context);
-  }
+const renderCode = (element: MarkdownElement, context: RenderContext): string =>
+  inlineCode(rawText(element.props.children, context));
 
-  if (type === "thead" || type === "tbody" || type === "tr") {
-    return renderBlocks(childrenToArray(children), context);
-  }
+const renderPre = (element: MarkdownElement, context: RenderContext): string => {
+  const language = stringProp(element.props, "lang") ?? stringProp(element.props, "language");
+  return codeFence(rawText(element.props.children, context), language);
+};
 
-  if (type === "th" || type === "td") {
-    return renderInline(children, context);
-  }
+const renderLink = (element: MarkdownElement, context: RenderContext): string => {
+  const href = escapeLinkDestination(stringProp(element.props, "href") ?? "");
+  return `[${renderInline(element.props.children, context)}](${href}${titlePart(element)})`;
+};
 
-  return renderInline(children, context);
+const renderImage = (element: MarkdownElement): string => {
+  const alt = escapeInline(stringProp(element.props, "alt") ?? "");
+  const source = escapeLinkDestination(stringProp(element.props, "src") ?? "");
+  return `![${alt}](${source}${titlePart(element)})`;
+};
+
+const renderTableElement = (element: MarkdownElement, context: RenderContext): string =>
+  renderTable(element, context, renderApi);
+
+const titlePart = (element: MarkdownElement): string => {
+  const title = stringProp(element.props, "title");
+  return title === undefined ? "" : ` ${JSON.stringify(title)}`;
 };
 
 const renderHeading = (children: MarkdownNode, level: number, context: RenderContext): string => {
@@ -195,150 +193,6 @@ const renderHeading = (children: MarkdownNode, level: number, context: RenderCon
 
   return `${"#".repeat(level)} ${renderInline(children, context)}`;
 };
-
-const renderList = (element: MarkdownElement, context: RenderContext, ordered: boolean): string => {
-  const start = ordered && typeof element.props["start"] === "number" ? element.props["start"] : 1;
-  const items = childrenToArray(element.props.children)
-    .map((child) => resolveComponent(child, context))
-    .filter(isElement)
-    .filter((child) => child.type === "li");
-
-  return items
-    .map((item, index) => {
-      const checked =
-        typeof item.props["checked"] === "boolean" ? item.props["checked"] : undefined;
-      if (checked !== undefined) {
-        requireFeature(context, "taskList", "li[checked]");
-      }
-
-      const prefix = ordered
-        ? `${String(start + index)}. `
-        : checked === undefined
-          ? "- "
-          : `- [${checked ? "x" : " "}] `;
-      const body = renderBlocks(childrenToArray(item.props.children), context);
-      const [firstLine = "", ...rest] = body.split("\n");
-      const continuationIndent = " ".repeat(ordered ? prefix.length : 2);
-      const indented = rest
-        .map((line) => (line.length === 0 ? "" : `${continuationIndent}${line}`))
-        .join("\n");
-      return indented.length === 0 ? `${prefix}${firstLine}` : `${prefix}${firstLine}\n${indented}`;
-    })
-    .join("\n");
-};
-
-const renderTable = (element: MarkdownElement, context: RenderContext): string => {
-  requireFeature(context, "table", "table");
-  const rows = collectRows(element, context);
-  if (rows.length === 0) {
-    return "";
-  }
-
-  const [header, ...body] = rows;
-  const columnCount = Math.max(...rows.map((row) => row.length));
-  const normalizedHeader = normalizeRow(header ?? [], columnCount);
-  const bodyRows = body.map((row) => normalizeRow(row, columnCount));
-  const escapedRows = [normalizedHeader, ...bodyRows].map((row) =>
-    row.map((cell) => escapeTableCell(cell.value)),
-  );
-  const widths = columnWidths(escapedRows, normalizedHeader);
-  const separator = normalizedHeader.map((cell, index) =>
-    separatorFor(cell.align, widths[index] ?? 3),
-  );
-  const lines = [
-    formatTableRow(escapedRows[0] ?? [], widths),
-    formatTableRow(separator, widths),
-    ...escapedRows.slice(1).map((row) => formatTableRow(row, widths)),
-  ];
-  return lines.join("\n");
-};
-
-interface TableCell {
-  readonly align?: "left" | "center" | "right";
-  readonly value: string;
-}
-
-const collectRows = (
-  element: MarkdownElement,
-  context: RenderContext,
-): readonly (readonly TableCell[])[] => {
-  const rows: TableCell[][] = [];
-  const visit = (node: MarkdownNode): void => {
-    const resolved = resolveComponent(node, context);
-    if (Array.isArray(resolved)) {
-      for (const child of resolved) {
-        visit(child);
-      }
-      return;
-    }
-
-    if (!isElement(resolved)) {
-      return;
-    }
-
-    if (resolved.type === "tr") {
-      rows.push(
-        childrenToArray(resolved.props.children)
-          .map((child) => resolveComponent(child, context))
-          .filter(isElement)
-          .filter((cell) => cell.type === "th" || cell.type === "td")
-          .map((cell) => {
-            const align = cell.props["align"];
-            return align === "left" || align === "center" || align === "right"
-              ? {
-                  align,
-                  value: renderInline(cell.props.children, context),
-                }
-              : {
-                  value: renderInline(cell.props.children, context),
-                };
-          }),
-      );
-      return;
-    }
-
-    visit(resolved.props.children);
-  };
-
-  visit(element.props.children);
-  return rows;
-};
-
-const separatorFor = (align: TableCell["align"], width: number): string => {
-  if (align === "left") {
-    return `:${"-".repeat(Math.max(3, width - 1))}`;
-  }
-
-  if (align === "center") {
-    return `:${"-".repeat(Math.max(3, width - 2))}:`;
-  }
-
-  if (align === "right") {
-    return `${"-".repeat(Math.max(3, width - 1))}:`;
-  }
-
-  return "-".repeat(Math.max(3, width));
-};
-
-const normalizeRow = (row: readonly TableCell[], columnCount: number): readonly TableCell[] => {
-  const next = [...row];
-  while (next.length < columnCount) {
-    next.push({ value: "" });
-  }
-  return next;
-};
-
-const columnWidths = (
-  rows: readonly (readonly string[])[],
-  header: readonly TableCell[],
-): readonly number[] =>
-  header.map((_cell, index) => Math.max(3, ...rows.map((row) => row[index]?.length ?? 0)));
-
-const formatTableRow = (row: readonly string[], widths: readonly number[]): string =>
-  `| ${widths.map((width, index) => padTableCell(row[index] ?? "", width)).join(" | ")} |`;
-
-const padTableCell = (value: string, width: number): string =>
-  value.length >= width ? value : `${value}${" ".repeat(width - value.length)}`;
 
 const resolveComponent = (node: MarkdownNode, context: RenderContext): MarkdownNode => {
   if (!isElement(node) || typeof node.type !== "function") {
@@ -351,132 +205,79 @@ const resolveComponent = (node: MarkdownNode, context: RenderContext): MarkdownN
 const renderBlocks = (
   children: readonly MarkdownNode[] | MarkdownNode,
   context: RenderContext,
-): string => {
-  const blocks: string[] = [];
-  let inlineChildren: MarkdownNode[] = [];
+): string => renderBlocksWithApi(children, context, renderApi);
 
-  const flushInline = (): void => {
-    if (inlineChildren.length === 0) {
-      return;
-    }
-
-    blocks.push(inlineChildren.map((child) => renderInline(child, context)).join(""));
-    inlineChildren = [];
-  };
-
-  const append = (node: MarkdownNode): void => {
-    const resolved = resolveComponent(node, context);
-    if (Array.isArray(resolved)) {
-      for (const child of resolved) {
-        append(child);
-      }
-      return;
-    }
-
-    if (isBlockNode(resolved)) {
-      flushInline();
-      blocks.push(renderBlock(resolved, context));
-      return;
-    }
-
-    inlineChildren.push(resolved);
-  };
-
-  for (const child of childrenToArray(children)) {
-    append(child);
-  }
-
-  flushInline();
-  return joinBlocks(blocks);
-};
-
-const joinBlocks = (blocks: readonly string[]): string =>
-  blocks
-    .map((block) => block.trimEnd())
-    .filter((block) => block.length > 0)
-    .join("\n\n");
-
-const childrenToArray = (children: MarkdownNode): MarkdownNode[] => {
-  if (children === null || children === undefined || children === false || children === true) {
-    return [];
-  }
-
-  if (Array.isArray(children)) {
-    return children.flatMap((child) => childrenToArray(child));
-  }
-
-  return [children];
-};
-
-const rawText = (children: MarkdownNode): string =>
+const rawText = (children: MarkdownNode, context: RenderContext): string =>
   childrenToArray(children)
-    .map((child) => {
-      if (typeof child === "string" || typeof child === "number") {
-        return String(child);
-      }
-
-      if (isElement(child) && child.type === "raw") {
-        return rawText(child.props.children);
-      }
-
-      return renderNode(child, { adapter: adapterFromName("markdown"), headingLevel: 1 }, "inline");
-    })
+    .map((child) => rawTextChild(child, context))
     .join("");
 
-const stringProp = (props: Readonly<Record<string, unknown>>, key: string): string | undefined => {
-  const value = props[key];
-  return typeof value === "string" ? value : undefined;
+const rawTextChild = (child: MarkdownNode, context: RenderContext): string => {
+  if (typeof child === "string" || typeof child === "number") {
+    return String(child);
+  }
+
+  if (isElement(child) && child.type === "raw") {
+    return rawText(child.props.children, context);
+  }
+
+  return renderNode(child, { adapter: adapterFromName("markdown"), headingLevel: 1 }, "inline");
 };
 
-const incrementHeading = (context: RenderContext): RenderContext => ({
-  ...context,
-  headingLevel: context.headingLevel + 1,
-});
+const numericProp = (props: Readonly<Record<string, unknown>>, key: string): number | undefined => {
+  const value = props[key];
+  return typeof value === "number" ? value : undefined;
+};
+
+const headingLevelFromElement = (element: MarkdownElement): number =>
+  typeof element.type === "string" ? Number(element.type.slice(1)) : 1;
+
+const isEmptyNode = (node: MarkdownNode): boolean =>
+  node === null || node === undefined || node === false || node === true;
 
 const toComponentContext = (context: RenderContext): ComponentContext => ({
   adapter: context.adapter,
   headingLevel: context.headingLevel,
   renderBlock: (node): string => renderBlock(node, context),
   renderInline: (node): string => renderInline(node, context),
-  requireAdapter: (feature, componentName): void => requireFeature(context, feature, componentName),
+  requireAdapter: (feature, componentName): void => {
+    requireFeature(context, feature, componentName);
+  },
 });
 
-const requireFeature = (
-  context: RenderContext,
-  feature: AdapterFeature,
-  componentName: string,
-): void => {
-  if (!context.adapter.features.has(feature)) {
-    throw new Error(
-      `${componentName} requires the ${feature} feature, but the ${context.adapter.name} adapter does not support it.`,
-    );
-  }
+const elementRenderers: Readonly<Record<string, ElementRenderer>> = {
+  // oxlint-disable id-length -- Renderer dispatch keys mirror Markdown and HTML tag names.
+  a: renderLink,
+  blockquote: renderBlockquote,
+  br: renderBreak,
+  code: renderCode,
+  del: renderDelete,
+  doc: renderContainer,
+  em: renderEmphasis,
+  fragment: renderContainer,
+  "heading-auto": renderAutoHeading,
+  hr: renderRule,
+  img: renderImage,
+  li: renderListItem,
+  ol: renderOrderedList,
+  p: renderParagraph,
+  pre: renderPre,
+  raw: renderRaw,
+  section: renderSection,
+  strong: renderStrong,
+  table: renderTableElement,
+  tbody: renderContainer,
+  td: renderParagraph,
+  th: renderParagraph,
+  thead: renderContainer,
+  tr: renderContainer,
+  ul: renderUnorderedList,
+  // oxlint-enable id-length
 };
 
-const isHeadingType = (value: string): boolean => /^h[1-6]$/.test(value);
-
-const isBlockNode = (node: MarkdownNode): boolean => {
-  if (!isElement(node) || typeof node.type !== "string") {
-    return false;
-  }
-
-  return blockElementTypes.has(node.type) || isHeadingType(node.type);
+const renderApi = {
+  renderBlock,
+  renderBlocks,
+  renderInline,
+  resolveComponent,
 };
-
-const blockElementTypes = new Set([
-  "blockquote",
-  "doc",
-  "fragment",
-  "heading-auto",
-  "hr",
-  "li",
-  "ol",
-  "p",
-  "pre",
-  "section",
-  "table",
-  "tbody",
-  "thead",
-  "tr",
-  "ul",
-]);

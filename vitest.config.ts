@@ -1,8 +1,9 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 const fromRoot = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
 
+// oxlint-disable-next-line import/no-default-export -- Vitest requires a default config export.
 export default defineConfig({
   resolve: {
     alias: [

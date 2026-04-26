@@ -1,21 +1,20 @@
 /** @jsxImportSource jsx2md */
-import { describe, expect, it } from "vitest";
 import { Doc, Heading, RawMarkdown, Section, render } from "jsx2md";
+import { describe, expect, it } from "vitest";
 
-describe("render", () => {
+describe("renderer basics", () => {
   it("renders headings, paragraphs, and conditional children", () => {
-    const includeDetails = true;
-
-    expect(
+    const renderConditional = (includeDetails: boolean): string =>
       render(
         <Doc>
           <h1>Release notes</h1>
           <p>Hello [world]</p>
-          {includeDetails ? <p>Included</p> : null}
+          {includeDetails ? <p>Included</p> : false}
           {false}
         </Doc>,
-      ),
-    ).toBe("# Release notes\n\nHello \\[world\\]\n\nIncluded\n");
+      );
+
+    expect(renderConditional(true)).toBe("# Release notes\n\nHello \\[world\\]\n\nIncluded\n");
   });
 
   it("renders lists and task list items with the GFM adapter", () => {
@@ -29,7 +28,9 @@ describe("render", () => {
       ),
     ).toBe("- Done\n- [x] Checked\n");
   });
+});
 
+describe("renderer block formats", () => {
   it("renders tables", () => {
     expect(
       render(
@@ -62,7 +63,9 @@ describe("render", () => {
       ),
     ).toBe("```ts\nconst value = `ok`;\n```\n\n<!-- generated -->\n");
   });
+});
 
+describe("automatic headings", () => {
   it("automatically adjusts heading levels", () => {
     expect(
       render(

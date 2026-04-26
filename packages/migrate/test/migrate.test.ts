@@ -1,17 +1,15 @@
-import { runInNewContext } from "node:vm";
+import { Doc, type MarkdownNode, RawMarkdown, type RenderOptions, render } from "jsx2md";
+import { Footnote, FootnoteRef, TaskItem, TaskList } from "@jsx2md/github";
+import { Fragment, jsx, jsxs } from "jsx2md/jsx-runtime";
+import { JsxEmit, ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { describe, expect, it } from "vitest";
-import { render } from "jsx2md";
-import * as core from "jsx2md";
-import * as jsxRuntime from "jsx2md/jsx-runtime";
-import * as github from "@jsx2md/github";
 import { migrateMarkdown } from "@jsx2md/migrate";
-import type { MarkdownNode, RenderOptions } from "jsx2md";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
-import { JsxEmit, ModuleKind, ScriptTarget, transpileModule } from "typescript";
+import { runInNewContext } from "node:vm";
 import { unified } from "unified";
 
-describe("migrateMarkdown", () => {
+describe("Markdown migration", () => {
   it("converts CommonMark and GFM nodes to TSX", () => {
     const result = migrateMarkdown(
       [
@@ -44,7 +42,9 @@ describe("migrateMarkdown", () => {
     expect(result.code).toContain("<RawMarkdown>");
     expect(result.diagnostics).toEqual(["Preserved HTML block as RawMarkdown."]);
   });
+});
 
+describe("migrateMarkdown semantic round trip", () => {
   it("round-trips migrated Markdown through rendered mdast semantics", () => {
     const source = [
       "# Title",
@@ -81,6 +81,10 @@ describe("migrateMarkdown", () => {
   });
 });
 
+const coreModule = { Doc, RawMarkdown };
+const githubModule = { Footnote, FootnoteRef, TaskItem, TaskList };
+const jsxRuntimeModule = { Fragment, jsx, jsxs };
+
 const renderMigrated = (code: string, options: RenderOptions): string => {
   const transpiled = transpileModule(code, {
     compilerOptions: {
@@ -116,15 +120,15 @@ interface CommonJsModule {
 
 const requireGeneratedModule = (source: string): unknown => {
   if (source === "jsx2md") {
-    return core;
+    return coreModule;
   }
 
   if (source === "@jsx2md/github") {
-    return github;
+    return githubModule;
   }
 
   if (source === "jsx2md/jsx-runtime") {
-    return jsxRuntime;
+    return jsxRuntimeModule;
   }
 
   throw new Error(`Unexpected generated import: ${source}`);
@@ -142,10 +146,12 @@ const normalizeSyntaxTree = (value: unknown): unknown => {
     return value;
   }
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Object.entries loses value precision for unknown syntax tree records.
+  const record = value as Record<string, unknown>;
+  const entries = Object.entries(record).filter(([key]) => key !== "position" && key !== "spread");
+  entries.sort(([left], [right]) => left.localeCompare(right));
+
   return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => key !== "position" && key !== "spread")
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, child]) => [key, normalizeSyntaxTree(child)]),
+    entries.map(([key, child]): [string, unknown] => [key, normalizeSyntaxTree(child)]),
   );
 };
