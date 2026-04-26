@@ -9,6 +9,18 @@ export const escapeInline = (value: string): string =>
 export const escapeTableCell = (value: string): string =>
   value.replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\n", " ");
 
+export const escapeLinkDestination = (value: string): string => {
+  if (value.length === 0) {
+    return "";
+  }
+
+  if (/[\s()<>]/.test(value)) {
+    return `<${value.replaceAll("\\", "\\\\").replaceAll("<", "\\<").replaceAll(">", "\\>")}>`;
+  }
+
+  return value.replaceAll("\\", "\\\\").replaceAll(")", "\\)");
+};
+
 export const escapeHtml = (value: string): string =>
   value
     .replaceAll("&", "&amp;")

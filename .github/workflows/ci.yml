@@ -51,8 +51,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Generated docs
+        run: pnpm docs:check:built
+
       - name: Smoke
         run: pnpm smoke
+
+      - name: Package smoke
+        run: pnpm pack:smoke
 
       - name: Size
         run: pnpm size

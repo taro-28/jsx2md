@@ -2,20 +2,37 @@
   "name": "jsx2md-monorepo",
   "version": "0.0.1",
   "private": true,
+  "homepage": "https://github.com/taro-28/jsx2md#readme",
+  "bugs": {
+    "url": "https://github.com/taro-28/jsx2md/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taro-28/jsx2md.git"
+  },
   "type": "module",
   "scripts": {
     "build": "pnpm -r --sort run build",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm build && pnpm smoke && pnpm size",
+    "changeset": "changeset",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm build && pnpm docs:check:built && pnpm smoke && pnpm pack:smoke && pnpm size",
+    "docs:check": "pnpm build && pnpm docs:check:built",
+    "docs:check:built": "node packages/cli/dist/cli.js check docs/readme.tsx -o README.md --adapter github",
+    "docs:readme": "pnpm build && pnpm docs:readme:built",
+    "docs:readme:built": "node packages/cli/dist/cli.js render docs/readme.tsx -o README.md --adapter github",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip",
     "lint": "node scripts/lint.mjs",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
     "size": "node scripts/check-size.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test": "vitest run",
-    "typecheck": "tsc -b --clean && tsc -b && tsc -p tsconfig.test.json --noEmit && tsc -b --clean && rm -rf packages/core/dist packages/github/dist packages/migrate/dist packages/cli/dist"
+    "typecheck": "tsc -b --clean && tsc -b && tsc -p tsconfig.test.json --noEmit && tsc -b --clean && rm -rf packages/core/dist packages/github/dist packages/migrate/dist packages/cli/dist",
+    "version-packages": "changeset version"
   },
   "devDependencies": {
+    "@changesets/cli": "2.31.0",
     "@jsx2md/cli": "workspace:*",
     "@jsx2md/github": "workspace:*",
     "@jsx2md/migrate": "workspace:*",

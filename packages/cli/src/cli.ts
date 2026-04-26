@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import type { AdapterName } from "jsx2md";
-import { checkOutput, loadJsonFile, migrateFile, renderEntry, writeOutput } from "./index.js";
+import { compareOutput, loadJsonFile, migrateFile, renderEntry, writeOutput } from "./index.js";
 
 interface RenderCommandOptions {
   readonly adapter?: AdapterName;
@@ -57,9 +57,10 @@ program
       adapter: options.adapter ?? "markdown",
       props,
     });
-    const matches = await checkOutput(markdown, options.output);
-    if (!matches) {
+    const result = await compareOutput(markdown, options.output);
+    if (!result.matches) {
       process.stderr.write(`${options.output} is out of date.\n`);
+      process.stderr.write(result.diff);
       process.exitCode = 1;
     }
   });

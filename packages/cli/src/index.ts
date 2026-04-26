@@ -16,20 +16,32 @@ export interface OutputOptions {
   readonly output?: string;
 }
 
+export interface CheckOutputResult {
+  readonly diff: string;
+  readonly matches: boolean;
+}
+
 export const renderEntry = async (
   entry: string,
   options: RenderEntryOptions = {},
 ): Promise<string> => {
   const runner = new URL("./entry-runner.js", import.meta.url);
+  const resolvedEntry = resolve(entry);
   const props = options.props === undefined ? "-" : encodeProps(options.props);
-  const { stdout } = await execFileAsync(
-    process.execPath,
-    ["--import", "tsx", runner.pathname, resolve(entry), options.adapter ?? "markdown", props],
-    {
-      maxBuffer: 10 * 1024 * 1024,
-    },
-  );
-  return stdout;
+
+  try {
+    const { stdout } = await execFileAsync(
+      process.execPath,
+      ["--import", "tsx", runner.pathname, resolvedEntry, options.adapter ?? "markdown", props],
+      {
+        encoding: "utf8",
+        maxBuffer: 10 * 1024 * 1024,
+      },
+    );
+    return stdout;
+  } catch (error) {
+    throw renderEntryError(error, resolvedEntry);
+  }
 };
 
 export const writeOutput = async (value: string, options: OutputOptions = {}): Promise<void> => {
@@ -42,8 +54,24 @@ export const writeOutput = async (value: string, options: OutputOptions = {}): P
 };
 
 export const checkOutput = async (value: string, output: string): Promise<boolean> => {
+  const result = await compareOutput(value, output);
+  return result.matches;
+};
+
+export const compareOutput = async (value: string, output: string): Promise<CheckOutputResult> => {
   const expected = await readFile(resolve(output), "utf8");
-  return expected === value;
+  const matches = expected === value;
+  return {
+    diff: matches
+      ? ""
+      : formatUnifiedDiff({
+          actual: value,
+          actualLabel: "generated",
+          expected,
+          expectedLabel: output,
+        }),
+    matches,
+  };
 };
 
 export const migrateFile = async (
@@ -64,3 +92,121 @@ export const loadJsonFile = async (path: string): Promise<unknown> =>
 
 const encodeProps = (props: unknown): string =>
   Buffer.from(JSON.stringify(props), "utf8").toString("base64url");
+
+interface UnifiedDiffOptions {
+  readonly actual: string;
+  readonly actualLabel: string;
+  readonly expected: string;
+  readonly expectedLabel: string;
+}
+
+const formatUnifiedDiff = ({
+  actual,
+  actualLabel,
+  expected,
+  expectedLabel,
+}: UnifiedDiffOptions): string => {
+  const expectedLines = diffLines(expected);
+  const actualLines = diffLines(actual);
+  const prefixLength = commonPrefixLength(expectedLines, actualLines);
+  const suffixLength = commonSuffixLength(expectedLines, actualLines, prefixLength);
+  const contextLength = 3;
+  const expectedChangeEnd = expectedLines.length - suffixLength;
+  const actualChangeEnd = actualLines.length - suffixLength;
+  const contextStart = Math.max(0, prefixLength - contextLength);
+  const expectedContextEnd = Math.min(expectedLines.length, expectedChangeEnd + contextLength);
+  const actualContextEnd = Math.min(actualLines.length, actualChangeEnd + contextLength);
+  const lines = [
+    `--- ${expectedLabel}`,
+    `+++ ${actualLabel}`,
+    `@@ -${String(contextStart + 1)},${String(
+      expectedContextEnd - contextStart,
+    )} +${String(contextStart + 1)},${String(actualContextEnd - contextStart)} @@`,
+  ];
+
+  for (const line of expectedLines.slice(contextStart, prefixLength)) {
+    lines.push(` ${line}`);
+  }
+
+  for (const line of expectedLines.slice(prefixLength, expectedChangeEnd)) {
+    lines.push(`-${line}`);
+  }
+
+  for (const line of actualLines.slice(prefixLength, actualChangeEnd)) {
+    lines.push(`+${line}`);
+  }
+
+  for (const line of expectedLines.slice(expectedChangeEnd, expectedContextEnd)) {
+    lines.push(` ${line}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+};
+
+const diffLines = (value: string): readonly string[] => {
+  if (value.length === 0) {
+    return [];
+  }
+
+  const hasTrailingLineBreak = value.endsWith("\n");
+  const content = hasTrailingLineBreak ? value.slice(0, -1) : value;
+  const lines = content.length === 0 ? [] : content.split("\n");
+  return hasTrailingLineBreak ? lines : [...lines, "\\ No newline at end of file"];
+};
+
+const commonPrefixLength = (left: readonly string[], right: readonly string[]): number => {
+  const limit = Math.min(left.length, right.length);
+  let index = 0;
+  while (index < limit && left[index] === right[index]) {
+    index += 1;
+  }
+
+  return index;
+};
+
+const commonSuffixLength = (
+  left: readonly string[],
+  right: readonly string[],
+  prefixLength: number,
+): number => {
+  const limit = Math.min(left.length, right.length) - prefixLength;
+  let index = 0;
+  while (index < limit && left[left.length - index - 1] === right[right.length - index - 1]) {
+    index += 1;
+  }
+
+  return index;
+};
+
+interface ProcessError extends Error {
+  readonly code?: number | string | null;
+  readonly signal?: string | null;
+  readonly stderr?: Buffer | string;
+  readonly stdout?: Buffer | string;
+}
+
+const renderEntryError = (error: unknown, entry: string): Error => {
+  const processError = error instanceof Error ? (error as ProcessError) : undefined;
+  const stderr = stringifyOutput(processError?.stderr).trim();
+  const stdout = stringifyOutput(processError?.stdout).trim();
+  const detail = [stderr, stdout].filter((value) => value.length > 0).join("\n");
+  const status =
+    processError?.code === undefined || processError.code === null
+      ? ""
+      : ` Exit code: ${String(processError.code)}.`;
+  const signal =
+    processError?.signal === undefined || processError.signal === null
+      ? ""
+      : ` Signal: ${processError.signal}.`;
+  const fallback = error instanceof Error ? error.message : String(error);
+  const message = detail.length > 0 ? detail : fallback;
+  return new Error(`Failed to render TSX entry ${entry}.${status}${signal}\n${message}`);
+};
+
+const stringifyOutput = (value: Buffer | string | undefined): string => {
+  if (value === undefined) {
+    return "";
+  }
+
+  return typeof value === "string" ? value : value.toString("utf8");
+};

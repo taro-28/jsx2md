@@ -1,5 +1,11 @@
 import { adapterFromName } from "./adapters.js";
-import { codeFence, escapeInline, escapeTableCell, inlineCode } from "./escape.js";
+import {
+  codeFence,
+  escapeInline,
+  escapeLinkDestination,
+  escapeTableCell,
+  inlineCode,
+} from "./escape.js";
 import { isElement } from "./runtime.js";
 import type {
   Adapter,
@@ -144,12 +150,7 @@ const renderElement = (
 
   if (type === "code") {
     const value = rawText(children);
-    if (mode === "inline") {
-      return inlineCode(value);
-    }
-
-    const language = stringProp(props, "lang") ?? stringProp(props, "language");
-    return codeFence(value, language);
+    return inlineCode(value);
   }
 
   if (type === "pre") {
@@ -158,14 +159,14 @@ const renderElement = (
   }
 
   if (type === "a") {
-    const href = stringProp(props, "href") ?? "";
+    const href = escapeLinkDestination(stringProp(props, "href") ?? "");
     const title = stringProp(props, "title");
     const titlePart = title === undefined ? "" : ` ${JSON.stringify(title)}`;
     return `[${renderInline(children, context)}](${href}${titlePart})`;
   }
 
   if (type === "img") {
-    const source = stringProp(props, "src") ?? "";
+    const source = escapeLinkDestination(stringProp(props, "src") ?? "");
     const alt = escapeInline(stringProp(props, "alt") ?? "");
     const title = stringProp(props, "title");
     const titlePart = title === undefined ? "" : ` ${JSON.stringify(title)}`;
@@ -217,7 +218,10 @@ const renderList = (element: MarkdownElement, context: RenderContext, ordered: b
           : `- [${checked ? "x" : " "}] `;
       const body = renderBlocks(childrenToArray(item.props.children), context);
       const [firstLine = "", ...rest] = body.split("\n");
-      const indented = rest.map((line) => `  ${line}`).join("\n");
+      const continuationIndent = " ".repeat(ordered ? prefix.length : 2);
+      const indented = rest
+        .map((line) => (line.length === 0 ? "" : `${continuationIndent}${line}`))
+        .join("\n");
       return indented.length === 0 ? `${prefix}${firstLine}` : `${prefix}${firstLine}\n${indented}`;
     })
     .join("\n");
@@ -233,11 +237,19 @@ const renderTable = (element: MarkdownElement, context: RenderContext): string =
   const [header, ...body] = rows;
   const columnCount = Math.max(...rows.map((row) => row.length));
   const normalizedHeader = normalizeRow(header ?? [], columnCount);
-  const separator = normalizedHeader.map((cell) => separatorFor(cell.align));
   const bodyRows = body.map((row) => normalizeRow(row, columnCount));
-  const lines = [normalizedHeader, separator, ...bodyRows].map(
-    (row) => `| ${row.map((cell) => escapeTableCell(cell.value)).join(" | ")} |`,
+  const escapedRows = [normalizedHeader, ...bodyRows].map((row) =>
+    row.map((cell) => escapeTableCell(cell.value)),
   );
+  const widths = columnWidths(escapedRows, normalizedHeader);
+  const separator = normalizedHeader.map((cell, index) =>
+    separatorFor(cell.align, widths[index] ?? 3),
+  );
+  const lines = [
+    formatTableRow(escapedRows[0] ?? [], widths),
+    formatTableRow(separator, widths),
+    ...escapedRows.slice(1).map((row) => formatTableRow(row, widths)),
+  ];
   return lines.join("\n");
 };
 
@@ -292,20 +304,20 @@ const collectRows = (
   return rows;
 };
 
-const separatorFor = (align: TableCell["align"]): TableCell => {
+const separatorFor = (align: TableCell["align"], width: number): string => {
   if (align === "left") {
-    return { value: ":---" };
+    return `:${"-".repeat(Math.max(3, width - 1))}`;
   }
 
   if (align === "center") {
-    return { value: ":---:" };
+    return `:${"-".repeat(Math.max(3, width - 2))}:`;
   }
 
   if (align === "right") {
-    return { value: "---:" };
+    return `${"-".repeat(Math.max(3, width - 1))}:`;
   }
 
-  return { value: "---" };
+  return "-".repeat(Math.max(3, width));
 };
 
 const normalizeRow = (row: readonly TableCell[], columnCount: number): readonly TableCell[] => {
@@ -315,6 +327,18 @@ const normalizeRow = (row: readonly TableCell[], columnCount: number): readonly 
   }
   return next;
 };
+
+const columnWidths = (
+  rows: readonly (readonly string[])[],
+  header: readonly TableCell[],
+): readonly number[] =>
+  header.map((_cell, index) => Math.max(3, ...rows.map((row) => row[index]?.length ?? 0)));
+
+const formatTableRow = (row: readonly string[], widths: readonly number[]): string =>
+  `| ${widths.map((width, index) => padTableCell(row[index] ?? "", width)).join(" | ")} |`;
+
+const padTableCell = (value: string, width: number): string =>
+  value.length >= width ? value : `${value}${" ".repeat(width - value.length)}`;
 
 const resolveComponent = (node: MarkdownNode, context: RenderContext): MarkdownNode => {
   if (!isElement(node) || typeof node.type !== "function") {
@@ -327,7 +351,44 @@ const resolveComponent = (node: MarkdownNode, context: RenderContext): MarkdownN
 const renderBlocks = (
   children: readonly MarkdownNode[] | MarkdownNode,
   context: RenderContext,
-): string => joinBlocks(childrenToArray(children).map((child) => renderBlock(child, context)));
+): string => {
+  const blocks: string[] = [];
+  let inlineChildren: MarkdownNode[] = [];
+
+  const flushInline = (): void => {
+    if (inlineChildren.length === 0) {
+      return;
+    }
+
+    blocks.push(inlineChildren.map((child) => renderInline(child, context)).join(""));
+    inlineChildren = [];
+  };
+
+  const append = (node: MarkdownNode): void => {
+    const resolved = resolveComponent(node, context);
+    if (Array.isArray(resolved)) {
+      for (const child of resolved) {
+        append(child);
+      }
+      return;
+    }
+
+    if (isBlockNode(resolved)) {
+      flushInline();
+      blocks.push(renderBlock(resolved, context));
+      return;
+    }
+
+    inlineChildren.push(resolved);
+  };
+
+  for (const child of childrenToArray(children)) {
+    append(child);
+  }
+
+  flushInline();
+  return joinBlocks(blocks);
+};
 
 const joinBlocks = (blocks: readonly string[]): string =>
   blocks
@@ -393,3 +454,29 @@ const requireFeature = (
 };
 
 const isHeadingType = (value: string): boolean => /^h[1-6]$/.test(value);
+
+const isBlockNode = (node: MarkdownNode): boolean => {
+  if (!isElement(node) || typeof node.type !== "string") {
+    return false;
+  }
+
+  return blockElementTypes.has(node.type) || isHeadingType(node.type);
+};
+
+const blockElementTypes = new Set([
+  "blockquote",
+  "doc",
+  "fragment",
+  "heading-auto",
+  "hr",
+  "li",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tbody",
+  "thead",
+  "tr",
+  "ul",
+]);
