@@ -28,6 +28,7 @@ describe("Markdown migration", () => {
     );
 
     expect(result.code).toContain("/** @jsxRuntime automatic */");
+    expect(result.code).toContain("/** @jsxImportSource jsx2md */");
     expect(result.code).toContain('<h1>{"Title"}</h1>');
     expect(result.code).toContain('<strong>{"world"}</strong>');
     expect(result.code).toContain("<TaskList>");
@@ -41,6 +42,14 @@ describe("Markdown migration", () => {
 
     expect(result.code).toContain("<RawMarkdown>");
     expect(result.diagnostics).toEqual(["Preserved HTML block as RawMarkdown."]);
+  });
+
+  it("can omit JSX pragma comments for projects with jsxImportSource in tsconfig", () => {
+    const result = migrateMarkdown("# Title\n", { pragma: false });
+
+    expect(result.code).not.toContain("@jsxRuntime");
+    expect(result.code).not.toContain("@jsxImportSource");
+    expect(result.code).toContain('import { Doc, RawMarkdown } from "jsx2md";');
   });
 });
 

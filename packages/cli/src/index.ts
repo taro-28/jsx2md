@@ -77,13 +77,10 @@ export const compareOutput = async (value: string, output: string): Promise<Chec
 
 export const migrateFile = async (
   input: string,
-  options: OutputOptions & { readonly adapter?: AdapterName } = {},
+  options: OutputOptions & { readonly adapter?: AdapterName; readonly pragma?: boolean } = {},
 ): Promise<readonly string[]> => {
   const source = await readFile(resolve(input), "utf8");
-  const result = migrateMarkdown(
-    source,
-    options.adapter === undefined ? {} : { adapter: options.adapter },
-  );
+  const result = migrateMarkdown(source, migrateOptions(options));
   await writeOutput(result.code, options);
   return result.diagnostics;
 };
@@ -93,6 +90,14 @@ export const loadJsonFile = async (path: string): Promise<unknown> =>
 
 const encodeProps = (props: unknown): string =>
   Buffer.from(JSON.stringify(props), "utf8").toString("base64url");
+
+const migrateOptions = (options: {
+  readonly adapter?: AdapterName;
+  readonly pragma?: boolean;
+}): Parameters<typeof migrateMarkdown>[1] => ({
+  ...(options.adapter === undefined ? {} : { adapter: options.adapter }),
+  ...(options.pragma === undefined ? {} : { pragma: options.pragma }),
+});
 
 interface UnifiedDiffOptions {
   readonly actual: string;

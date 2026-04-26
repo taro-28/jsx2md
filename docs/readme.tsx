@@ -4,6 +4,7 @@ import { Doc, type MarkdownNode, RawMarkdown, Section } from "jsx2md";
 import { Alert } from "@jsx2md/github";
 
 const shell = (value: string): MarkdownNode => <pre lang="sh">{value}</pre>;
+const json = (value: string): MarkdownNode => <pre lang="json">{value}</pre>;
 const tsx = (value: string): MarkdownNode => <pre lang="tsx">{value}</pre>;
 
 const packages = [
@@ -30,9 +31,30 @@ export default (
         <p>This repository uses pnpm workspaces.</p>
         {shell("pnpm install\npnpm build")}
       </Section>
-      <Section title="Programmatic API">
+      <Section title="JSX Runtime Setup">
+        <p>
+          Most projects should configure the JSX runtime once in <code>tsconfig.json</code>.
+          Per-file pragma comments are useful for standalone TSX entries and generated migration
+          output, but they are not required when the project config already points JSX at{" "}
+          <code>jsx2md</code>.
+        </p>
+        {json(`{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}`)}
         {tsx(`/** @jsxImportSource jsx2md */
-import { Doc, render } from "jsx2md";
+import { Doc } from "jsx2md";
+
+export default (
+  <Doc>
+    <h1>Standalone entry</h1>
+  </Doc>
+);`)}
+      </Section>
+      <Section title="Programmatic API">
+        {tsx(`import { Doc, render } from "jsx2md";
 
 const markdown = render(
   <Doc>
@@ -45,7 +67,8 @@ const markdown = render(
         {shell(`jsx2md render docs/readme.tsx -o README.md --adapter github
 jsx2md render docs/readme.tsx --adapter github
 jsx2md check docs/readme.tsx -o README.md --adapter github
-jsx2md migrate README.md -o docs/readme.tsx --adapter github`)}
+jsx2md migrate README.md -o docs/readme.tsx --adapter github
+jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma`)}
         <p>Exit codes:</p>
         <ul>
           <li>
@@ -58,7 +81,9 @@ jsx2md migrate README.md -o docs/readme.tsx --adapter github`)}
           </li>
           <li>
             <code>migrate</code>: <code>0</code> when TSX is generated, <code>1</code> on read,
-            parse, or write errors. Preservation diagnostics are printed to stderr.
+            parse, or write errors. Preservation diagnostics are printed to stderr. Generated TSX
+            includes JSX pragma comments by default; pass <code>--no-pragma</code> when your project
+            already configures <code>jsxImportSource</code>.
           </li>
         </ul>
       </Section>

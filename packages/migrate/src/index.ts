@@ -21,6 +21,7 @@ import { unified } from "unified";
 
 export interface MigrateOptions {
   readonly adapter?: "markdown" | "gfm" | "github";
+  readonly pragma?: boolean;
 }
 
 export interface MigrateResult {
@@ -36,11 +37,7 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
     source,
   };
   const body = tree.children.map((node) => blockToTsx(node, state, options)).join("\n");
-  const imports = [
-    "/** @jsxRuntime automatic */",
-    "/** @jsxImportSource jsx2md */",
-    'import { Doc, RawMarkdown } from "jsx2md";',
-  ];
+  const imports = [...pragmaComments(options), 'import { Doc, RawMarkdown } from "jsx2md";'];
 
   if (state.githubImports.size > 0) {
     imports.push(
@@ -53,6 +50,11 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
     diagnostics: state.diagnostics,
   };
 };
+
+const pragmaComments = (options: MigrateOptions): readonly string[] =>
+  options.pragma === false
+    ? []
+    : ["/** @jsxRuntime automatic */", "/** @jsxImportSource jsx2md */"];
 
 const blockToTsx = (node: RootContent, state: MigrationState, options: MigrateOptions): string =>
   simpleBlockToTsx(node, state) ??

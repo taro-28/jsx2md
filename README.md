@@ -14,10 +14,33 @@ pnpm install
 pnpm build
 ```
 
-## Programmatic API
+## JSX Runtime Setup
+
+Most projects should configure the JSX runtime once in `tsconfig.json`. Per-file pragma comments are useful for standalone TSX entries and generated migration output, but they are not required when the project config already points JSX at `jsx2md`.
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}
+```
 
 ```tsx
 /** @jsxImportSource jsx2md */
+import { Doc } from "jsx2md";
+
+export default (
+  <Doc>
+    <h1>Standalone entry</h1>
+  </Doc>
+);
+```
+
+## Programmatic API
+
+```tsx
 import { Doc, render } from "jsx2md";
 
 const markdown = render(
@@ -35,13 +58,14 @@ jsx2md render docs/readme.tsx -o README.md --adapter github
 jsx2md render docs/readme.tsx --adapter github
 jsx2md check docs/readme.tsx -o README.md --adapter github
 jsx2md migrate README.md -o docs/readme.tsx --adapter github
+jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma
 ```
 
 Exit codes:
 
 - `render`: `0` when Markdown is generated, `1` on load or render errors.
 - `check`: `0` when output matches, `1` when output differs or an error occurs. Mismatches print a unified diff.
-- `migrate`: `0` when TSX is generated, `1` on read, parse, or write errors. Preservation diagnostics are printed to stderr.
+- `migrate`: `0` when TSX is generated, `1` on read, parse, or write errors. Preservation diagnostics are printed to stderr. Generated TSX includes JSX pragma comments by default; pass `--no-pragma` when your project already configures `jsxImportSource`.
 
 ## Generated README
 

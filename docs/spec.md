@@ -25,7 +25,18 @@ render(node, options);
 
 The renderer accepts JSX nodes created by the custom JSX runtime and returns a Markdown string. It also exports runtime helpers for non-JSX usage.
 
-TSX usage is enabled with:
+Projects usually enable TSX usage once in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}
+```
+
+Standalone TSX entries can instead use a per-file pragma:
 
 ```tsx
 /** @jsxImportSource jsx2md */
@@ -58,6 +69,7 @@ jsx2md render <entry.tsx> -o README.md --adapter github --props props.json
 jsx2md render <entry.tsx>
 jsx2md check <entry.tsx> -o README.md
 jsx2md migrate <input.md> -o <output.tsx> --adapter github
+jsx2md migrate <input.md> -o <output.tsx> --adapter github --no-pragma
 ```
 
 TSX entries should default-export either a JSX node or a function that receives JSON props.
@@ -65,6 +77,8 @@ TSX entries should default-export either a JSX node or a function that receives 
 ## Migration
 
 Migration converts Markdown to TSX using mdast. It prioritizes semantic preservation over byte-for-byte formatting. Unknown nodes and embedded HTML are preserved through a raw Markdown escape hatch so conversion does not silently drop content.
+
+Generated TSX includes JSX runtime pragma comments by default so migrated files work as standalone CLI entries. Users can pass `pragma: false` to `migrateMarkdown()` or `--no-pragma` to the CLI when their project already configures `jsxImportSource`.
 
 ## Standards
 

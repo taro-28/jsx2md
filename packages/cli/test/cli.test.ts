@@ -41,7 +41,9 @@ describe("CLI helpers", () => {
       matches: false,
     });
   });
+});
 
+describe("CLI migration helpers", () => {
   it("migrates Markdown files", async () => {
     const directory = await mkdtemp(join(tmpdir(), "jsx2md-cli-"));
     const inputPath = join(directory, "README.md");
@@ -50,5 +52,17 @@ describe("CLI helpers", () => {
 
     await expect(migrateFile(inputPath, { output: outputPath })).resolves.toEqual([]);
     await expect(readFile(outputPath, "utf8")).resolves.toContain('<h1>{"Title"}</h1>');
+  });
+
+  it("can migrate Markdown without JSX pragma comments", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jsx2md-cli-"));
+    const inputPath = join(directory, "README.md");
+    const outputPath = join(directory, "README.tsx");
+    await writeFile(inputPath, "# Title\n");
+
+    await expect(migrateFile(inputPath, { output: outputPath, pragma: false })).resolves.toEqual(
+      [],
+    );
+    await expect(readFile(outputPath, "utf8")).resolves.not.toContain("@jsxImportSource");
   });
 });

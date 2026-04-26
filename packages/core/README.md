@@ -5,7 +5,8 @@ Core renderer, JSX runtime, standard Markdown components, and adapter definition
 ## API
 
 - `render(node, options)` renders a JSX tree or runtime node to Markdown.
-- `/** @jsxImportSource jsx2md */` enables the custom JSX runtime.
+- `jsxImportSource: "jsx2md"` in `tsconfig.json` enables the custom JSX runtime for a project.
+- `/** @jsxImportSource jsx2md */` can enable the runtime for standalone TSX files.
 - `Doc`, `Section`, `Heading`, and `RawMarkdown` provide document-level primitives.
 - Intrinsic components such as `h1`, `p`, `ul`, `table`, `code`, and `pre` map to Markdown syntax.
 

@@ -12,6 +12,7 @@ interface RenderCommandOptions {
 interface MigrateCommandOptions {
   readonly adapter?: AdapterName;
   readonly output?: string;
+  readonly pragma?: boolean;
 }
 
 const program = new Command();
@@ -70,10 +71,12 @@ program
   .argument("<input>", "Markdown file to convert")
   .option("-o, --output <file>", "output TSX file, or - for stdout")
   .option("--adapter <adapter>", "markdown, gfm, or github", parseAdapter, "markdown")
+  .option("--no-pragma", "omit JSX runtime pragma comments from generated TSX")
   .action(async (input: string, options: MigrateCommandOptions) => {
     const diagnostics = await migrateFile(input, {
       adapter: options.adapter ?? "markdown",
       ...(options.output === undefined ? {} : { output: options.output }),
+      ...(options.pragma === undefined ? {} : { pragma: options.pragma }),
     });
     for (const diagnostic of diagnostics) {
       process.stderr.write(`${diagnostic}\n`);
