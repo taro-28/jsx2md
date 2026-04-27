@@ -16,6 +16,11 @@ const packages = [
     name: "@jsx2md/github",
   },
   {
+    directory: "packages/gfm",
+    files: ["package/dist/index.js", "package/README.md"],
+    name: "@jsx2md/gfm",
+  },
+  {
     directory: "packages/migrate",
     files: ["package/dist/index.js", "package/README.md"],
     name: "@jsx2md/migrate",

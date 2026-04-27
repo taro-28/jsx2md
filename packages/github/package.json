@@ -1,7 +1,7 @@
 {
   "name": "@jsx2md/github",
   "version": "0.0.1",
-  "description": "GitHub Markdown components and adapters for jsx2md.",
+  "description": "GitHub-specific Markdown components and adapters for jsx2md.",
   "keywords": [
     "gfm",
     "github",

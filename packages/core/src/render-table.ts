@@ -4,6 +4,7 @@ import {
   childrenToArray,
   isMarkdownNodeArray,
   requireFeature,
+  supportsFeature,
 } from "./render-shared.js";
 import { escapeTableCell } from "./escape.js";
 import { isElement } from "./runtime.js";
@@ -34,9 +35,23 @@ export const renderTable = (
   context: RenderContext,
   api: TableRenderApi,
 ): string => {
-  requireFeature(context, "table", "table");
   const rows = collectRows(element, context, api);
+  if (!supportsFeature(context, "table")) {
+    return renderUnsupportedTable(rows, context);
+  }
+
   return rows.length === 0 ? "" : renderTableRows(rows);
+};
+
+const renderUnsupportedTable = (
+  rows: readonly (readonly TableCell[])[],
+  context: RenderContext,
+): string => {
+  if (context.unsupported === "error") {
+    requireFeature(context, "table", "table");
+  }
+
+  return rows.map((row) => row.map((cell) => cell.value).join(" | ")).join("\n");
 };
 
 const renderTableRows = (rows: readonly (readonly TableCell[])[]): string => {

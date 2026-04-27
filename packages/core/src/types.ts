@@ -2,6 +2,8 @@ export const elementSymbol = Symbol.for("jsx2md.element");
 
 export type AdapterName = "markdown" | "gfm" | "github";
 
+export type UnsupportedBehavior = "error" | "omit" | "plain";
+
 export type AdapterFeature =
   | "gfm"
   | "github"
@@ -42,6 +44,7 @@ export interface ComponentContext {
   readonly renderBlock: (node: MarkdownNode) => string;
   readonly renderInline: (node: MarkdownNode) => string;
   readonly requireAdapter: (feature: AdapterFeature, componentName: string) => void;
+  readonly unsupported: UnsupportedBehavior;
 }
 
 export type Component<Props extends object = Record<string, unknown>> = (
@@ -53,6 +56,7 @@ export type Component<Props extends object = Record<string, unknown>> = (
 
 export interface RenderOptions {
   readonly adapter?: Adapter | AdapterName;
+  readonly unsupported?: UnsupportedBehavior;
 }
 
 export interface CommonProps {
@@ -99,10 +103,34 @@ export interface RawMarkdownProps {
   readonly children: string;
 }
 
+export type AdmonitionVariant = "caution" | "important" | "note" | "tip" | "warning";
+
+export interface AdmonitionProps extends CommonProps {
+  readonly title?: MarkdownChildren;
+  readonly variant: AdmonitionVariant;
+}
+
 export interface SectionProps extends CommonProps {
   readonly title?: MarkdownChildren;
 }
 
 export interface AutoHeadingProps extends CommonProps {
   readonly level?: number;
+}
+
+export interface DetailsProps extends CommonProps {
+  readonly open?: boolean;
+  readonly summary: MarkdownChildren;
+}
+
+export interface FenceProps {
+  readonly children: string;
+}
+
+export interface KbdProps {
+  readonly children: string;
+}
+
+export interface AnchorProps {
+  readonly id: string;
 }

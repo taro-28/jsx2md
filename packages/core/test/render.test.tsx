@@ -1,5 +1,17 @@
 /** @jsxImportSource jsx2md */
-import { Doc, Heading, RawMarkdown, Section, render } from "jsx2md";
+import {
+  Admonition,
+  Anchor,
+  Details,
+  Diff,
+  Doc,
+  Heading,
+  Kbd,
+  Mermaid,
+  RawMarkdown,
+  Section,
+  render,
+} from "jsx2md";
 import { describe, expect, it } from "vitest";
 
 describe("renderer basics", () => {
@@ -27,6 +39,27 @@ describe("renderer basics", () => {
         { adapter: "gfm" },
       ),
     ).toBe("- Done\n- [x] Checked\n");
+  });
+
+  it("rejects unsupported GFM syntax by default", () => {
+    expect(() =>
+      render(
+        <ul>
+          <li checked>Checked</li>
+        </ul>,
+      ),
+    ).toThrow("requires the taskList feature");
+  });
+
+  it("can render unsupported GFM syntax as plain Markdown", () => {
+    expect(
+      render(
+        <ul>
+          <li checked>Checked</li>
+        </ul>,
+        { unsupported: "plain" },
+      ),
+    ).toBe("- Checked\n");
   });
 });
 
@@ -62,6 +95,77 @@ describe("renderer block formats", () => {
         </Doc>,
       ),
     ).toBe("```ts\nconst value = `ok`;\n```\n\n<!-- generated -->\n");
+  });
+});
+
+describe("portable admonition component", () => {
+  it("renders admonitions as GitHub alerts for the GitHub adapter", () => {
+    expect(
+      render(
+        <Admonition variant="note" title="Heads up">
+          Read this.
+        </Admonition>,
+        { adapter: "github" },
+      ),
+    ).toBe("> [!NOTE]\n> **Heads up**\n> Read this.\n");
+  });
+
+  it("renders admonitions as readable blockquotes for portable Markdown", () => {
+    expect(
+      render(
+        <Admonition variant="tip" title="Hint">
+          Use the API.
+        </Admonition>,
+      ),
+    ).toBe("> **TIP**\n> **Hint**\n> Use the API.\n");
+  });
+});
+
+describe("portable HTML and fence components", () => {
+  it("renders HTML-backed helpers with the markdown adapter", () => {
+    expect(
+      render(
+        <p>
+          Press <Kbd>Cmd</Kbd>
+          {"+"}
+          <Kbd>K</Kbd>
+          <Anchor id="shortcuts" />.
+        </p>,
+      ),
+    ).toBe('Press <kbd>Cmd</kbd>+<kbd>K</kbd><a id="shortcuts"></a>.\n');
+  });
+
+  it("renders details blocks and portable code fences", () => {
+    expect(
+      render(
+        <Doc>
+          <Details summary="More">
+            <p>Body</p>
+          </Details>
+          <Diff>{"- old\n+ new"}</Diff>
+          <Mermaid>{"graph TD\nA-->B"}</Mermaid>
+        </Doc>,
+      ),
+    ).toBe(
+      [
+        "<details>",
+        "<summary>More</summary>",
+        "",
+        "Body",
+        "</details>",
+        "",
+        "```diff",
+        "- old",
+        "+ new",
+        "```",
+        "",
+        "```mermaid",
+        "graph TD",
+        "A-->B",
+        "```",
+        "",
+      ].join("\n"),
+    );
   });
 });
 

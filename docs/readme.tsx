@@ -1,15 +1,15 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { Doc, type MarkdownNode, RawMarkdown, Section } from "jsx2md";
-import { Alert } from "@jsx2md/github";
+import { Admonition, Doc, type MarkdownNode, RawMarkdown, Section } from "jsx2md";
 
 const shell = (value: string): MarkdownNode => <pre lang="sh">{value}</pre>;
 const json = (value: string): MarkdownNode => <pre lang="json">{value}</pre>;
 const tsx = (value: string): MarkdownNode => <pre lang="tsx">{value}</pre>;
 
 const packages = [
-  ["jsx2md", "Core renderer, JSX runtime, Markdown components, and adapters."],
-  ["@jsx2md/github", "GitHub Markdown adapter and GitHub-only components."],
+  ["jsx2md", "Core renderer, JSX runtime, CommonMark components, and adapters."],
+  ["@jsx2md/gfm", "GitHub Flavored Markdown components."],
+  ["@jsx2md/github", "GitHub-specific components."],
   ["@jsx2md/migrate", "Markdown to TSX migration utilities."],
   ["@jsx2md/cli", "The `jsx2md` command for render, check, and migrate workflows."],
 ];
@@ -23,10 +23,10 @@ export default (
         typed README generation, GitHub pull request comments, and migration from hand-written
         Markdown to maintainable TSX documents.
       </p>
-      <Alert variant="note">
+      <Admonition variant="note">
         Version <code>0.0.1</code> is an initial implementation. The repository is not configured
         for automatic publishing.
-      </Alert>
+      </Admonition>
       <Section title="Install">
         <p>This repository uses pnpm workspaces.</p>
         {shell("pnpm install\npnpm build")}
@@ -66,6 +66,7 @@ const markdown = render(
       <Section title="CLI">
         {shell(`jsx2md render docs/readme.tsx -o README.md --adapter github
 jsx2md render docs/readme.tsx --adapter github
+jsx2md render docs/readme.tsx --adapter markdown --unsupported plain
 jsx2md check docs/readme.tsx -o README.md --adapter github
 jsx2md migrate README.md -o docs/readme.tsx --adapter github
 jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma`)}
@@ -86,6 +87,25 @@ jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma`)}
             already configures <code>jsxImportSource</code>.
           </li>
         </ul>
+      </Section>
+      <Section title="Adapters">
+        <ul>
+          <li>
+            <code>markdown</code>: CommonMark-oriented Markdown with raw HTML support.
+          </li>
+          <li>
+            <code>gfm</code>: GitHub Flavored Markdown features such as tables, task lists,
+            strikethrough, and footnotes.
+          </li>
+          <li>
+            <code>github</code>: GitHub.com syntax for repositories, issues, pull requests, and
+            comments.
+          </li>
+        </ul>
+        <p>
+          Unsupported syntax throws by default. Pass <code>unsupported: "plain"</code> or{" "}
+          <code>unsupported: "omit"</code> only when fallback output is intentional.
+        </p>
       </Section>
       <Section title="Generated README">
         <p>

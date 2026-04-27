@@ -1,7 +1,8 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { Alert, Details, TaskItem, TaskList } from "@jsx2md/github";
-import { Doc, type MarkdownNode, Section } from "jsx2md";
+import { Details, Doc, type MarkdownNode, Section } from "jsx2md";
+import { TaskItem, TaskList } from "@jsx2md/gfm";
+import { Alert } from "@jsx2md/github";
 
 export interface PullRequestCommentProps {
   readonly changedFiles: readonly string[];

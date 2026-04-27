@@ -5,7 +5,8 @@ This repository is English-only. Keep tracked source, documentation, tests, pack
 ## Engineering Principles
 
 - Keep `jsx2md` core lightweight. Parser, migration, CLI, and GitHub-only dependencies must stay outside the core package.
-- Make adapters explicit. Components that depend on GitHub-only behavior must fail clearly when rendered with an unsupported adapter.
+- Make adapters explicit. Components that depend on non-portable behavior must fail clearly when rendered with an unsupported adapter.
+- Unsupported content must not be silently dropped by default; use explicit fallback policies when loss or simplification is intended.
 - Follow standards first: CommonMark for portable Markdown, GitHub Flavored Markdown for tables/task lists/footnotes, and GitHub Docs for GitHub-only extensions.
 - Treat `render()` as the primary API. The CLI is a convenience layer over the same behavior.
 - Public APIs require tests covering behavior and types.

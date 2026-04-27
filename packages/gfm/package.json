@@ -1,12 +1,11 @@
 {
-  "name": "@jsx2md/migrate",
+  "name": "@jsx2md/gfm",
   "version": "0.0.1",
-  "description": "Convert Markdown files to jsx2md TSX documents.",
+  "description": "GitHub Flavored Markdown components for jsx2md.",
   "keywords": [
+    "gfm",
     "jsx",
-    "markdown",
-    "migration",
-    "tsx"
+    "markdown"
   ],
   "homepage": "https://github.com/taro-28/jsx2md#readme",
   "bugs": {
@@ -16,7 +15,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/taro-28/jsx2md.git",
-    "directory": "packages/migrate"
+    "directory": "packages/gfm"
   },
   "files": [
     "dist",
@@ -36,12 +35,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@jsx2md/gfm": "workspace:*",
-    "jsx2md": "workspace:*",
-    "mdast-util-to-markdown": "2.1.2",
-    "remark-gfm": "4.0.1",
-    "remark-parse": "11.0.0",
-    "unified": "11.0.5"
+    "jsx2md": "workspace:*"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -1,14 +1,12 @@
 # @jsx2md/github
 
-GitHub Markdown adapter and GitHub-only components for `jsx2md`.
+GitHub-specific Markdown components and adapter exports for `jsx2md`.
 
 ## Components
 
-- `Alert`, `Details`, `Suggestion`, `Diff`
-- `TaskList`, `TaskItem`
+- `Alert`, `Suggestion`
 - `IssueRef`, `PullRef`, `CommitRef`, `Mention`
-- `Footnote`, `FootnoteRef`
-- `Mermaid`, `GeoJSON`, `TopoJSON`, `STL`
-- `Color`, `Emoji`, `Kbd`, `Anchor`
+- `GeoJSON`, `TopoJSON`, `STL`
+- `Color`, `Emoji`
 
-Render these components with the `github` adapter unless the component only requires a GFM feature.
+Render these components with the `github` adapter. GitHub Flavored Markdown components such as task lists, footnotes, and strikethrough text live in `@jsx2md/gfm`.

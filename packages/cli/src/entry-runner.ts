@@ -1,8 +1,11 @@
-import { type AdapterName, type MarkdownNode, render } from "jsx2md";
+import { type AdapterName, type MarkdownNode, type UnsupportedBehavior, render } from "jsx2md";
 import { pathToFileURL } from "node:url";
 
 const isAdapterName = (value: string): value is AdapterName =>
   value === "markdown" || value === "gfm" || value === "github";
+
+const isUnsupportedBehavior = (value: string): value is UnsupportedBehavior =>
+  value === "error" || value === "plain" || value === "omit";
 
 const resolveDefaultExport = async (
   exportedValue: unknown,
@@ -32,14 +35,23 @@ const unwrapDefault = (value: unknown): unknown => {
   return value;
 };
 
-const [entry, adapter, encodedProps] = process.argv.slice(2);
+const [entry, adapter, encodedProps, unsupported] = process.argv.slice(2);
 
-if (entry === undefined || adapter === undefined || encodedProps === undefined) {
-  throw new Error("entry-runner requires entry, adapter, and props arguments.");
+if (
+  entry === undefined ||
+  adapter === undefined ||
+  encodedProps === undefined ||
+  unsupported === undefined
+) {
+  throw new Error("entry-runner requires entry, adapter, props, and unsupported arguments.");
 }
 
 if (!isAdapterName(adapter)) {
   throw new Error(`Unsupported adapter: ${adapter}`);
+}
+
+if (!isUnsupportedBehavior(unsupported)) {
+  throw new Error(`Unsupported unsupported behavior: ${unsupported}`);
 }
 
 const props =
@@ -57,4 +69,4 @@ if (defaultExport === undefined) {
 }
 
 const node = await resolveDefaultExport(defaultExport, props);
-process.stdout.write(render(node, { adapter }));
+process.stdout.write(render(node, { adapter, unsupported }));

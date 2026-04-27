@@ -10,6 +10,7 @@ import {
   markdownProp,
   requireFeature,
   stringProp,
+  supportsFeature,
 } from "./render-shared.js";
 import { codeFence, escapeInline, escapeLinkDestination, inlineCode } from "./escape.js";
 import { adapterFromName } from "./adapters.js";
@@ -29,7 +30,11 @@ export const render = (node: MarkdownNode, options: RenderOptions = {}): string 
     typeof options.adapter === "string"
       ? adapterFromName(options.adapter)
       : (options.adapter ?? adapterFromName("markdown"));
-  const output = renderBlock(node, { adapter, headingLevel: 1 }).trimEnd();
+  const output = renderBlock(node, {
+    adapter,
+    headingLevel: 1,
+    unsupported: options.unsupported ?? "error",
+  }).trimEnd();
   return output.length === 0 ? "" : `${output}\n`;
 };
 
@@ -83,14 +88,11 @@ const renderElement = (
     return renderInline(element.props.children, context);
   }
 
-  const renderer = elementRenderers[type] ?? headingRenderer(type);
+  const renderer = elementRenderers[type] ?? (isHeadingType(type) ? renderFixedHeading : undefined);
   return renderer === undefined
     ? renderInline(element.props.children, context)
     : renderer(element, context, mode);
 };
-
-const headingRenderer = (type: string): ElementRenderer | undefined =>
-  isHeadingType(type) ? renderFixedHeading : undefined;
 
 const renderRaw = (element: MarkdownElement, context: RenderContext): string => {
   const { children } = element.props;
@@ -132,8 +134,15 @@ const renderEmphasis = (element: MarkdownElement, context: RenderContext): strin
   `_${renderInline(element.props.children, context)}_`;
 
 const renderDelete = (element: MarkdownElement, context: RenderContext): string => {
-  requireFeature(context, "gfm", "del");
-  return `~~${renderInline(element.props.children, context)}~~`;
+  if (supportsFeature(context, "gfm")) {
+    return `~~${renderInline(element.props.children, context)}~~`;
+  }
+
+  if (context.unsupported === "error") {
+    requireFeature(context, "gfm", "del");
+  }
+
+  return renderInline(element.props.children, context);
 };
 
 const renderBreak = (
@@ -221,7 +230,15 @@ const rawTextChild = (child: MarkdownNode, context: RenderContext): string => {
     return rawText(child.props.children, context);
   }
 
-  return renderNode(child, { adapter: adapterFromName("markdown"), headingLevel: 1 }, "inline");
+  return renderNode(
+    child,
+    {
+      adapter: adapterFromName("markdown"),
+      headingLevel: 1,
+      unsupported: context.unsupported,
+    },
+    "inline",
+  );
 };
 
 const numericProp = (props: Readonly<Record<string, unknown>>, key: string): number | undefined => {
@@ -243,6 +260,7 @@ const toComponentContext = (context: RenderContext): ComponentContext => ({
   requireAdapter: (feature, componentName): void => {
     requireFeature(context, feature, componentName);
   },
+  unsupported: context.unsupported,
 });
 
 const elementRenderers: Readonly<Record<string, ElementRenderer>> = {
@@ -275,9 +293,4 @@ const elementRenderers: Readonly<Record<string, ElementRenderer>> = {
   // oxlint-enable id-length
 };
 
-const renderApi = {
-  renderBlock,
-  renderBlocks,
-  renderInline,
-  resolveComponent,
-};
+const renderApi = { renderBlock, renderBlocks, renderInline, resolveComponent };

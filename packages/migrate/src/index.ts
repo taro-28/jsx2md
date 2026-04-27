@@ -33,11 +33,16 @@ export const migrateMarkdown = (source: string, options: MigrateOptions = {}): M
   const tree = unified().use(remarkParse).use(remarkGfm).parse(source);
   const state: MigrationState = {
     diagnostics: [],
+    gfmImports: new Set(),
     githubImports: new Set(),
     source,
   };
   const body = tree.children.map((node) => blockToTsx(node, state, options)).join("\n");
   const imports = [...pragmaComments(options), 'import { Doc, RawMarkdown } from "jsx2md";'];
+
+  if (state.gfmImports.size > 0) {
+    imports.push(`import { ${[...state.gfmImports].toSorted().join(", ")} } from "@jsx2md/gfm";`);
+  }
 
   if (state.githubImports.size > 0) {
     imports.push(
@@ -59,7 +64,7 @@ const pragmaComments = (options: MigrateOptions): readonly string[] =>
 const blockToTsx = (node: RootContent, state: MigrationState, options: MigrateOptions): string =>
   simpleBlockToTsx(node, state) ??
   containerBlockToTsx(node, state, options) ??
-  githubBlockToTsx(node, state, options) ??
+  extensionBlockToTsx(node, state, options) ??
   unknownToTsx(node, state);
 
 const simpleBlockToTsx = (node: RootContent, state: MigrationState): string | undefined => {
@@ -105,7 +110,7 @@ const containerBlockToTsx = (
   return undefined;
 };
 
-const githubBlockToTsx = (
+const extensionBlockToTsx = (
   node: RootContent,
   state: MigrationState,
   options: MigrateOptions,
@@ -115,7 +120,7 @@ const githubBlockToTsx = (
   }
 
   if (node.type === "footnoteDefinition") {
-    state.githubImports.add("Footnote");
+    state.gfmImports.add("Footnote");
     return `<Footnote id=${quoteAttribute(node.identifier)}>${node.children
       .map((child) => blockToTsx(child, state, options))
       .join("")}</Footnote>`;
@@ -132,9 +137,9 @@ const paragraphToTsx = (node: Paragraph, state: MigrationState): string =>
 
 const listToTsx = (node: List, state: MigrationState, options: MigrateOptions): string => {
   const hasTasks = node.children.some((item) => item.checked !== null);
-  if (hasTasks && options.adapter === "github") {
-    state.githubImports.add("TaskItem");
-    state.githubImports.add("TaskList");
+  if (hasTasks) {
+    state.gfmImports.add("TaskItem");
+    state.gfmImports.add("TaskList");
     return wrap(
       "TaskList",
       node.children
@@ -189,7 +194,7 @@ const inlineNodeToTsx = (node: PhrasingContent, state: MigrationState): string =
   textInlineToTsx(node) ??
   phrasingInlineToTsx(node, state) ??
   resourceInlineToTsx(node, state) ??
-  githubInlineToTsx(node, state) ??
+  extensionInlineToTsx(node, state) ??
   unknownToTsx(node, state);
 
 const textInlineToTsx = (node: PhrasingContent): string | undefined => {
@@ -236,13 +241,13 @@ const resourceInlineToTsx = (node: PhrasingContent, state: MigrationState): stri
   return undefined;
 };
 
-const githubInlineToTsx = (node: PhrasingContent, state: MigrationState): string | undefined => {
+const extensionInlineToTsx = (node: PhrasingContent, state: MigrationState): string | undefined => {
   if (node.type === "html") {
     return rawToTsx(node, state, "inline HTML");
   }
 
   if (node.type === "footnoteReference") {
-    state.githubImports.add("FootnoteRef");
+    state.gfmImports.add("FootnoteRef");
     return `<FootnoteRef id=${quoteAttribute(node.identifier)} />`;
   }
 

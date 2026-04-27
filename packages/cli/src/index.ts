@@ -1,5 +1,5 @@
+import type { AdapterName, UnsupportedBehavior } from "jsx2md";
 import { readFile, writeFile } from "node:fs/promises";
-import type { AdapterName } from "jsx2md";
 import { execFile } from "node:child_process";
 import { migrateMarkdown } from "@jsx2md/migrate";
 import { promisify } from "node:util";
@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 export interface RenderEntryOptions {
   readonly adapter?: AdapterName;
   readonly props?: unknown;
+  readonly unsupported?: UnsupportedBehavior;
 }
 
 export interface OutputOptions {
@@ -33,7 +34,15 @@ export const renderEntry = async (
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ["--import", "tsx", runner.pathname, resolvedEntry, options.adapter ?? "markdown", props],
+      [
+        "--import",
+        "tsx",
+        runner.pathname,
+        resolvedEntry,
+        options.adapter ?? "markdown",
+        props,
+        options.unsupported ?? "error",
+      ],
       {
         encoding: "utf8",
         maxBuffer: 10 * 1024 * 1024,

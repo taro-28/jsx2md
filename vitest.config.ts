@@ -20,6 +20,10 @@ export default defineConfig({
         replacement: fromRoot("./packages/cli/src/index.ts"),
       },
       {
+        find: "@jsx2md/gfm",
+        replacement: fromRoot("./packages/gfm/src/index.ts"),
+      },
+      {
         find: "@jsx2md/github",
         replacement: fromRoot("./packages/github/src/index.ts"),
       },

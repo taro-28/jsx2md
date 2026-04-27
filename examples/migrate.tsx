@@ -1,6 +1,6 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { TaskItem, TaskList } from "@jsx2md/github";
+import { TaskItem, TaskList } from "@jsx2md/gfm";
 import { Doc } from "jsx2md";
 
 // oxlint-disable-next-line import/no-default-export -- TSX entries are loaded by the CLI through their default export.

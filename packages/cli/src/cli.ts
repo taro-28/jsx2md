@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+import type { AdapterName, UnsupportedBehavior } from "jsx2md";
 import { compareOutput, loadJsonFile, migrateFile, renderEntry, writeOutput } from "./index.js";
-import type { AdapterName } from "jsx2md";
 import { Command } from "commander";
 
 interface RenderCommandOptions {
   readonly adapter?: AdapterName;
   readonly output?: string;
   readonly props?: string;
+  readonly unsupported?: UnsupportedBehavior;
 }
 
 interface MigrateCommandOptions {
@@ -25,6 +26,14 @@ const parseAdapter = (value: string): AdapterName => {
   throw new Error(`Unsupported adapter: ${value}`);
 };
 
+const parseUnsupported = (value: string): UnsupportedBehavior => {
+  if (value === "error" || value === "plain" || value === "omit") {
+    return value;
+  }
+
+  throw new Error(`Unsupported unsupported behavior: ${value}`);
+};
+
 program.name("jsx2md").description("Generate Markdown from JSX and TSX.").version("0.0.1");
 
 program
@@ -32,12 +41,14 @@ program
   .argument("<entry>", "TSX entry file")
   .option("-o, --output <file>", "output file, or - for stdout")
   .option("--adapter <adapter>", "markdown, gfm, or github", parseAdapter, "markdown")
+  .option("--unsupported <behavior>", "error, plain, or omit", parseUnsupported, "error")
   .option("--props <file>", "JSON props passed to a function default export")
   .action(async (entry: string, options: RenderCommandOptions) => {
     const props = options.props === undefined ? undefined : await loadJsonFile(options.props);
     const markdown = await renderEntry(entry, {
       adapter: options.adapter ?? "markdown",
       props,
+      unsupported: options.unsupported ?? "error",
     });
     await writeOutput(markdown, options.output === undefined ? {} : { output: options.output });
   });
@@ -47,6 +58,7 @@ program
   .argument("<entry>", "TSX entry file")
   .requiredOption("-o, --output <file>", "file to compare with generated output")
   .option("--adapter <adapter>", "markdown, gfm, or github", parseAdapter, "markdown")
+  .option("--unsupported <behavior>", "error, plain, or omit", parseUnsupported, "error")
   .option("--props <file>", "JSON props passed to a function default export")
   .action(async (entry: string, options: RenderCommandOptions) => {
     if (options.output === undefined) {
@@ -57,6 +69,7 @@ program
     const markdown = await renderEntry(entry, {
       adapter: options.adapter ?? "markdown",
       props,
+      unsupported: options.unsupported ?? "error",
     });
     const result = await compareOutput(markdown, options.output);
     if (!result.matches) {

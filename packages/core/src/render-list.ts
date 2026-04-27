@@ -1,5 +1,10 @@
 import type { MarkdownElement, MarkdownNode } from "./types.js";
-import { type RenderContext, childrenToArray, requireFeature } from "./render-shared.js";
+import {
+  type RenderContext,
+  childrenToArray,
+  requireFeature,
+  supportsFeature,
+} from "./render-shared.js";
 import { isElement } from "./runtime.js";
 
 interface ListRenderApi {
@@ -67,18 +72,32 @@ const renderListItem = (
   options: RenderListItemOptions,
 ): string => {
   const checked = typeof item.props["checked"] === "boolean" ? item.props["checked"] : undefined;
-  requireTaskListFeature(checked, options.context);
+  const visibleChecked = visibleTaskListMarker(checked, options.context);
 
-  const prefix = listPrefix({ checked, index, ordered: options.ordered, start: options.start });
+  const prefix = listPrefix({
+    checked: visibleChecked,
+    index,
+    ordered: options.ordered,
+    start: options.start,
+  });
   const body = options.api.renderBlocks(childrenToArray(item.props.children), options.context);
   const [firstLine = "", ...rest] = body.split("\n");
   return formatListItem({ firstLine, ordered: options.ordered, prefix, rest });
 };
 
-const requireTaskListFeature = (checked: boolean | undefined, context: RenderContext): void => {
-  if (checked !== undefined) {
+const visibleTaskListMarker = (
+  checked: boolean | undefined,
+  context: RenderContext,
+): boolean | undefined => {
+  if (checked === undefined || supportsFeature(context, "taskList")) {
+    return checked;
+  }
+
+  if (context.unsupported === "error") {
     requireFeature(context, "taskList", "li[checked]");
   }
+
+  return undefined;
 };
 
 const listPrefix = ({ checked, index, ordered, start }: ListPrefixOptions): string => {

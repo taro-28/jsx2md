@@ -1,5 +1,5 @@
 import { Doc, type MarkdownNode, RawMarkdown, type RenderOptions, render } from "jsx2md";
-import { Footnote, FootnoteRef, TaskItem, TaskList } from "@jsx2md/github";
+import { Footnote, FootnoteRef, TaskItem, TaskList } from "@jsx2md/gfm";
 import { Fragment, jsx, jsxs } from "jsx2md/jsx-runtime";
 import { JsxEmit, ModuleKind, ScriptTarget, transpileModule } from "typescript";
 import { describe, expect, it } from "vitest";
@@ -29,6 +29,7 @@ describe("Markdown migration", () => {
 
     expect(result.code).toContain("/** @jsxRuntime automatic */");
     expect(result.code).toContain("/** @jsxImportSource jsx2md */");
+    expect(result.code).toContain('from "@jsx2md/gfm"');
     expect(result.code).toContain('<h1>{"Title"}</h1>');
     expect(result.code).toContain('<strong>{"world"}</strong>');
     expect(result.code).toContain("<TaskList>");
@@ -91,7 +92,7 @@ describe("migrateMarkdown semantic round trip", () => {
 });
 
 const coreModule = { Doc, RawMarkdown };
-const githubModule = { Footnote, FootnoteRef, TaskItem, TaskList };
+const gfmModule = { Footnote, FootnoteRef, TaskItem, TaskList };
 const jsxRuntimeModule = { Fragment, jsx, jsxs };
 
 const renderMigrated = (code: string, options: RenderOptions): string => {
@@ -132,8 +133,8 @@ const requireGeneratedModule = (source: string): unknown => {
     return coreModule;
   }
 
-  if (source === "@jsx2md/github") {
-    return githubModule;
+  if (source === "@jsx2md/gfm") {
+    return gfmModule;
   }
 
   if (source === "jsx2md/jsx-runtime") {

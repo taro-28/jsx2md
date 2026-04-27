@@ -1,9 +1,10 @@
-import type { Adapter, AdapterFeature, MarkdownNode } from "./types.js";
+import type { Adapter, AdapterFeature, MarkdownNode, UnsupportedBehavior } from "./types.js";
 import { isElement } from "./runtime.js";
 
 export interface RenderContext {
   readonly adapter: Adapter;
   readonly headingLevel: number;
+  readonly unsupported: UnsupportedBehavior;
 }
 
 export type RenderMode = "block" | "inline";
@@ -61,6 +62,9 @@ export const requireFeature = (
   }
 };
 
+export const supportsFeature = (context: RenderContext, feature: AdapterFeature): boolean =>
+  context.adapter.features.has(feature);
+
 export const stringProp = (
   props: Readonly<Record<string, unknown>>,
   key: string,
@@ -94,6 +98,7 @@ const blockElementTypes = new Set([
   "ol",
   "p",
   "pre",
+  "raw",
   "section",
   "table",
   "tbody",
