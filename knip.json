@@ -1,14 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip/schema.json",
   "ignore": ["packages/core/test/type-contract.tsx"],
-  "ignoreDependencies": [
-    "@jsx2md/cli",
-    "@jsx2md/github",
-    "@jsx2md/migrate",
-    "oxlint",
-    "oxlint-tsgolint",
-    "tsx"
-  ],
+  "ignoreDependencies": ["oxlint", "oxlint-tsgolint", "tsx"],
   "workspaces": {
     ".": {
       "entry": [
@@ -17,6 +10,9 @@
         "examples/pr-comment.tsx",
         "examples/readme.tsx"
       ]
+    },
+    "packages/cli": {
+      "entry": ["src/entry-runner.ts"]
     }
   }
 }

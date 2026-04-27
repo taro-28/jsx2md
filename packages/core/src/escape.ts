@@ -1,13 +1,16 @@
 export const escapeInline = (value: string): string =>
   value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("[", "\\[")
-    .replaceAll("]", "\\]")
-    .replaceAll("*", "\\*")
-    .replaceAll("_", "\\_");
+    .replaceAll("\\", String.raw`\\`)
+    .replaceAll("[", String.raw`\[`)
+    .replaceAll("]", String.raw`\]`)
+    .replaceAll("*", String.raw`\*`)
+    .replaceAll("_", String.raw`\_`);
 
 export const escapeTableCell = (value: string): string =>
-  value.replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("\n", " ");
+  value
+    .replaceAll("\\", String.raw`\\`)
+    .replaceAll("|", String.raw`\|`)
+    .replaceAll("\n", " ");
 
 export const escapeLinkDestination = (value: string): string => {
   if (value.length === 0) {
@@ -15,10 +18,13 @@ export const escapeLinkDestination = (value: string): string => {
   }
 
   if (/[\s()<>]/.test(value)) {
-    return `<${value.replaceAll("\\", "\\\\").replaceAll("<", "\\<").replaceAll(">", "\\>")}>`;
+    return `<${value
+      .replaceAll("\\", String.raw`\\`)
+      .replaceAll("<", String.raw`\<`)
+      .replaceAll(">", String.raw`\>`)}>`;
   }
 
-  return value.replaceAll("\\", "\\\\").replaceAll(")", "\\)");
+  return value.replaceAll("\\", String.raw`\\`).replaceAll(")", String.raw`\)`);
 };
 
 export const escapeHtml = (value: string): string =>

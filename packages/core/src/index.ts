@@ -1,5 +1,16 @@
 export { adapterFromName, gfmAdapter, githubAdapter, markdownAdapter } from "./adapters.js";
-export { Doc, Heading, RawMarkdown, Section } from "./components.js";
+export {
+  Admonition,
+  Anchor,
+  Details,
+  Diff,
+  Doc,
+  Heading,
+  Kbd,
+  Mermaid,
+  RawMarkdown,
+  Section,
+} from "./components.js";
 export { escapeHtml } from "./escape.js";
 export { render } from "./render.js";
 export { Fragment, createElement, isElement } from "./runtime.js";
@@ -7,14 +18,20 @@ export type {
   Adapter,
   AdapterFeature,
   AdapterName,
+  AdmonitionProps,
+  AdmonitionVariant,
+  AnchorProps,
   AutoHeadingProps,
   BlockquoteProps,
   CodeProps,
   CommonProps,
   Component,
   ComponentContext,
+  DetailsProps,
+  FenceProps,
   HeadingElementProps,
   ImageProps,
+  KbdProps,
   LinkProps,
   ListItemProps,
   ListProps,
@@ -26,4 +43,5 @@ export type {
   RenderOptions,
   SectionProps,
   TableCellProps,
+  UnsupportedBehavior,
 } from "./types.js";

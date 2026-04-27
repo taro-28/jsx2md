@@ -1,13 +1,13 @@
 /** @jsxImportSource jsx2md */
-import { describe, expect, it } from "vitest";
 import { Doc, RawMarkdown, render } from "jsx2md";
+import { describe, expect, it } from "vitest";
 
-describe("CommonMark and GFM fixtures", () => {
+describe("CommonMark fixtures", () => {
   it("escapes inline text without changing raw markdown", () => {
     expect(
       render(
         <Doc>
-          <p>{"*stars* _under_ [link] \\ slash"}</p>
+          <p>{String.raw`*stars* _under_ [link] \ slash`}</p>
           <RawMarkdown>{"<!-- raw -->"}</RawMarkdown>
         </Doc>,
       ),
@@ -42,7 +42,9 @@ describe("CommonMark and GFM fixtures", () => {
       ),
     ).toBe("> Quoted\n>\n> - Item\n");
   });
+});
 
+describe("GFM fixtures", () => {
   it("renders tables and escapes table cell separators", () => {
     expect(
       render(

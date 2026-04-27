@@ -1,0 +1,67 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "node", "promise", "unicorn", "jsdoc", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "style": "error",
+    "restriction": "error",
+    "nursery": "error",
+  },
+  "options": {
+    "typeAware": true,
+    "typeCheck": true,
+    "reportUnusedDisableDirectives": "error",
+  },
+  "env": {
+    "node": true,
+    "es2024": true,
+  },
+  "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**", "pnpm-lock.yaml"],
+  "rules": {
+    // Markdown fixtures, CLI exit codes, syntax markers, and size limits are clearer as inline literals.
+    "no-magic-numbers": "off",
+    // Renderer and migration value selection often reads best as a ternary; nested ternaries remain enabled.
+    "no-ternary": "off",
+    // Optional props and sentinels intentionally distinguish explicit undefined from other empty values.
+    "no-undefined": "off",
+    // Public APIs stay at the top of source files, with private helpers below their call sites.
+    "no-use-before-define": "off",
+    // JSX-style components are uppercase functions and may be called directly by renderer helpers.
+    "new-cap": "off",
+    // Library packages expose named exports as their public API.
+    "import/no-named-export": "off",
+    // TypeScript declarations, JSX namespaces, and package barrels are more readable near their definitions.
+    "import/exports-last": "off",
+    // Splitting type and value exports keeps package API files explicit.
+    "import/group-exports": "off",
+    // Oxlint cannot satisfy this together with no-duplicate-imports and TypeScript inline type imports from packages that export both values and types.
+    "import/consistent-type-specifier-style": "off",
+    // Named exports are the package convention, so default-only files should not be required.
+    "import/prefer-default-export": "off",
+    // CLI and repository scripts are Node programs and intentionally use Node builtins.
+    "import/no-nodejs-modules": "off",
+    // This is a Vitest repository; Jest-only rules do not apply to the test suite.
+    "jest/max-expects": "off",
+    "jest/no-conditional-in-test": "off",
+    "jest/prefer-lowercase-title": "off",
+    "jest/prefer-strict-equal": "off",
+    "jest/require-hook": "off",
+    "jest/valid-title": "off",
+    // TypeScript, JSX runtime, and ts-expect-error pragmas are not JSDoc tags.
+    "jsdoc/check-tag-names": "off",
+    // Tests explicitly import Vitest helpers instead of relying on globals.
+    "vitest/no-importing-vitest-globals": "off",
+    // Exact boolean assertions are clearer for helper results; these conflict with vitest/prefer-strict-boolean-matchers.
+    "vitest/prefer-to-be-falsy": "off",
+    "vitest/prefer-to-be-truthy": "off",
+    // Per-test timeout annotations are noise for this fast unit test suite.
+    "vitest/require-test-timeout": "off",
+    // Custom JSX runtime declarations require the TypeScript JSX namespace.
+    "typescript/no-namespace": "off",
+    // Public component APIs and mdast/unified types make this too noisy for limited safety gain.
+    "prefer-readonly-parameter-types": "off",
+  },
+}

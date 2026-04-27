@@ -1,19 +1,20 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource jsx2md */
-import { Doc, RawMarkdown, Section } from "jsx2md";
-import { Alert } from "@jsx2md/github";
-import type { MarkdownNode } from "jsx2md";
+import { Admonition, Doc, type MarkdownNode, RawMarkdown, Section } from "jsx2md";
 
 const shell = (value: string): MarkdownNode => <pre lang="sh">{value}</pre>;
+const json = (value: string): MarkdownNode => <pre lang="json">{value}</pre>;
 const tsx = (value: string): MarkdownNode => <pre lang="tsx">{value}</pre>;
 
 const packages = [
-  ["jsx2md", "Core renderer, JSX runtime, Markdown components, and adapters."],
-  ["@jsx2md/github", "GitHub Markdown adapter and GitHub-only components."],
+  ["jsx2md", "Core renderer, JSX runtime, CommonMark components, and adapters."],
+  ["@jsx2md/gfm", "GitHub Flavored Markdown components."],
+  ["@jsx2md/github", "GitHub-specific components."],
   ["@jsx2md/migrate", "Markdown to TSX migration utilities."],
   ["@jsx2md/cli", "The `jsx2md` command for render, check, and migrate workflows."],
 ];
 
+// oxlint-disable-next-line import/no-default-export -- TSX entries are loaded by the CLI through their default export.
 export default (
   <Doc>
     <Section title="jsx2md">
@@ -22,17 +23,38 @@ export default (
         typed README generation, GitHub pull request comments, and migration from hand-written
         Markdown to maintainable TSX documents.
       </p>
-      <Alert variant="note">
+      <Admonition variant="note">
         Version <code>0.0.1</code> is an initial implementation. The repository is not configured
         for automatic publishing.
-      </Alert>
+      </Admonition>
       <Section title="Install">
         <p>This repository uses pnpm workspaces.</p>
         {shell("pnpm install\npnpm build")}
       </Section>
-      <Section title="Programmatic API">
+      <Section title="JSX Runtime Setup">
+        <p>
+          Most projects should configure the JSX runtime once in <code>tsconfig.json</code>.
+          Per-file pragma comments are useful for standalone TSX entries and generated migration
+          output, but they are not required when the project config already points JSX at{" "}
+          <code>jsx2md</code>.
+        </p>
+        {json(`{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}`)}
         {tsx(`/** @jsxImportSource jsx2md */
-import { Doc, render } from "jsx2md";
+import { Doc } from "jsx2md";
+
+export default (
+  <Doc>
+    <h1>Standalone entry</h1>
+  </Doc>
+);`)}
+      </Section>
+      <Section title="Programmatic API">
+        {tsx(`import { Doc, render } from "jsx2md";
 
 const markdown = render(
   <Doc>
@@ -44,8 +66,10 @@ const markdown = render(
       <Section title="CLI">
         {shell(`jsx2md render docs/readme.tsx -o README.md --adapter github
 jsx2md render docs/readme.tsx --adapter github
+jsx2md render docs/readme.tsx --adapter markdown --unsupported plain
 jsx2md check docs/readme.tsx -o README.md --adapter github
-jsx2md migrate README.md -o docs/readme.tsx --adapter github`)}
+jsx2md migrate README.md -o docs/readme.tsx --adapter github
+jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma`)}
         <p>Exit codes:</p>
         <ul>
           <li>
@@ -58,9 +82,30 @@ jsx2md migrate README.md -o docs/readme.tsx --adapter github`)}
           </li>
           <li>
             <code>migrate</code>: <code>0</code> when TSX is generated, <code>1</code> on read,
-            parse, or write errors. Preservation diagnostics are printed to stderr.
+            parse, or write errors. Preservation diagnostics are printed to stderr. Generated TSX
+            includes JSX pragma comments by default; pass <code>--no-pragma</code> when your project
+            already configures <code>jsxImportSource</code>.
           </li>
         </ul>
+      </Section>
+      <Section title="Adapters">
+        <ul>
+          <li>
+            <code>markdown</code>: CommonMark-oriented Markdown with raw HTML support.
+          </li>
+          <li>
+            <code>gfm</code>: GitHub Flavored Markdown features such as tables, task lists,
+            strikethrough, and footnotes.
+          </li>
+          <li>
+            <code>github</code>: GitHub.com syntax for repositories, issues, pull requests, and
+            comments.
+          </li>
+        </ul>
+        <p>
+          Unsupported syntax throws by default. Pass <code>unsupported: "plain"</code> or{" "}
+          <code>unsupported: "omit"</code> only when fallback output is intentional.
+        </p>
       </Section>
       <Section title="Generated README">
         <p>

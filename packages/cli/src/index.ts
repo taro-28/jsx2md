@@ -1,15 +1,17 @@
+import type { AdapterName, UnsupportedBehavior } from "jsx2md";
 import { readFile, writeFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { resolve } from "node:path";
-import { promisify } from "node:util";
 import { migrateMarkdown } from "@jsx2md/migrate";
-import type { AdapterName } from "jsx2md";
+import { promisify } from "node:util";
+import { resolve } from "node:path";
 
+// oxlint-disable-next-line typescript/strict-void-return -- Node's execFile overload is compatible with util.promisify at runtime.
 const execFileAsync = promisify(execFile);
 
 export interface RenderEntryOptions {
   readonly adapter?: AdapterName;
   readonly props?: unknown;
+  readonly unsupported?: UnsupportedBehavior;
 }
 
 export interface OutputOptions {
@@ -25,14 +27,22 @@ export const renderEntry = async (
   entry: string,
   options: RenderEntryOptions = {},
 ): Promise<string> => {
-  const runner = new URL("./entry-runner.js", import.meta.url);
+  const runner = new URL("entry-runner.js", import.meta.url);
   const resolvedEntry = resolve(entry);
   const props = options.props === undefined ? "-" : encodeProps(options.props);
 
   try {
     const { stdout } = await execFileAsync(
       process.execPath,
-      ["--import", "tsx", runner.pathname, resolvedEntry, options.adapter ?? "markdown", props],
+      [
+        "--import",
+        "tsx",
+        runner.pathname,
+        resolvedEntry,
+        options.adapter ?? "markdown",
+        props,
+        options.unsupported ?? "error",
+      ],
       {
         encoding: "utf8",
         maxBuffer: 10 * 1024 * 1024,
@@ -76,13 +86,10 @@ export const compareOutput = async (value: string, output: string): Promise<Chec
 
 export const migrateFile = async (
   input: string,
-  options: OutputOptions & { readonly adapter?: AdapterName } = {},
+  options: OutputOptions & { readonly adapter?: AdapterName; readonly pragma?: boolean } = {},
 ): Promise<readonly string[]> => {
   const source = await readFile(resolve(input), "utf8");
-  const result = migrateMarkdown(
-    source,
-    options.adapter === undefined ? {} : { adapter: options.adapter },
-  );
+  const result = migrateMarkdown(source, migrateOptions(options));
   await writeOutput(result.code, options);
   return result.diagnostics;
 };
@@ -92,6 +99,14 @@ export const loadJsonFile = async (path: string): Promise<unknown> =>
 
 const encodeProps = (props: unknown): string =>
   Buffer.from(JSON.stringify(props), "utf8").toString("base64url");
+
+const migrateOptions = (options: {
+  readonly adapter?: AdapterName;
+  readonly pragma?: boolean;
+}): Parameters<typeof migrateMarkdown>[1] => ({
+  ...(options.adapter === undefined ? {} : { adapter: options.adapter }),
+  ...(options.pragma === undefined ? {} : { pragma: options.pragma }),
+});
 
 interface UnifiedDiffOptions {
   readonly actual: string;
@@ -108,40 +123,69 @@ const formatUnifiedDiff = ({
 }: UnifiedDiffOptions): string => {
   const expectedLines = diffLines(expected);
   const actualLines = diffLines(actual);
+  const window = diffWindow(expectedLines, actualLines);
+  const lines = [
+    ...diffHeader(expectedLabel, actualLabel, window),
+    ...diffBody(expectedLines, actualLines, window),
+  ];
+
+  return `${lines.join("\n")}\n`;
+};
+
+interface DiffWindow {
+  readonly actualChangeEnd: number;
+  readonly actualContextEnd: number;
+  readonly contextStart: number;
+  readonly expectedChangeEnd: number;
+  readonly expectedContextEnd: number;
+  readonly prefixLength: number;
+}
+
+const diffWindow = (
+  expectedLines: readonly string[],
+  actualLines: readonly string[],
+): DiffWindow => {
   const prefixLength = commonPrefixLength(expectedLines, actualLines);
   const suffixLength = commonSuffixLength(expectedLines, actualLines, prefixLength);
   const contextLength = 3;
   const expectedChangeEnd = expectedLines.length - suffixLength;
   const actualChangeEnd = actualLines.length - suffixLength;
-  const contextStart = Math.max(0, prefixLength - contextLength);
-  const expectedContextEnd = Math.min(expectedLines.length, expectedChangeEnd + contextLength);
-  const actualContextEnd = Math.min(actualLines.length, actualChangeEnd + contextLength);
-  const lines = [
-    `--- ${expectedLabel}`,
-    `+++ ${actualLabel}`,
-    `@@ -${String(contextStart + 1)},${String(
-      expectedContextEnd - contextStart,
-    )} +${String(contextStart + 1)},${String(actualContextEnd - contextStart)} @@`,
-  ];
-
-  for (const line of expectedLines.slice(contextStart, prefixLength)) {
-    lines.push(` ${line}`);
-  }
-
-  for (const line of expectedLines.slice(prefixLength, expectedChangeEnd)) {
-    lines.push(`-${line}`);
-  }
-
-  for (const line of actualLines.slice(prefixLength, actualChangeEnd)) {
-    lines.push(`+${line}`);
-  }
-
-  for (const line of expectedLines.slice(expectedChangeEnd, expectedContextEnd)) {
-    lines.push(` ${line}`);
-  }
-
-  return `${lines.join("\n")}\n`;
+  return {
+    actualChangeEnd,
+    actualContextEnd: Math.min(actualLines.length, actualChangeEnd + contextLength),
+    contextStart: Math.max(0, prefixLength - contextLength),
+    expectedChangeEnd,
+    expectedContextEnd: Math.min(expectedLines.length, expectedChangeEnd + contextLength),
+    prefixLength,
+  };
 };
+
+const diffHeader = (
+  expectedLabel: string,
+  actualLabel: string,
+  window: DiffWindow,
+): readonly string[] => [
+  `--- ${expectedLabel}`,
+  `+++ ${actualLabel}`,
+  `@@ -${String(window.contextStart + 1)},${String(
+    window.expectedContextEnd - window.contextStart,
+  )} +${String(window.contextStart + 1)},${String(
+    window.actualContextEnd - window.contextStart,
+  )} @@`,
+];
+
+const diffBody = (
+  expectedLines: readonly string[],
+  actualLines: readonly string[],
+  window: DiffWindow,
+): readonly string[] => [
+  ...expectedLines.slice(window.contextStart, window.prefixLength).map((line) => ` ${line}`),
+  ...expectedLines.slice(window.prefixLength, window.expectedChangeEnd).map((line) => `-${line}`),
+  ...actualLines.slice(window.prefixLength, window.actualChangeEnd).map((line) => `+${line}`),
+  ...expectedLines
+    .slice(window.expectedChangeEnd, window.expectedContextEnd)
+    .map((line) => ` ${line}`),
+];
 
 const diffLines = (value: string): readonly string[] => {
   if (value.length === 0) {
@@ -151,7 +195,7 @@ const diffLines = (value: string): readonly string[] => {
   const hasTrailingLineBreak = value.endsWith("\n");
   const content = hasTrailingLineBreak ? value.slice(0, -1) : value;
   const lines = content.length === 0 ? [] : content.split("\n");
-  return hasTrailingLineBreak ? lines : [...lines, "\\ No newline at end of file"];
+  return hasTrailingLineBreak ? lines : [...lines, String.raw`\ No newline at end of file`];
 };
 
 const commonPrefixLength = (left: readonly string[], right: readonly string[]): number => {

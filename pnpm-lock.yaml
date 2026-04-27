@@ -14,6 +14,9 @@ importers:
       '@jsx2md/cli':
         specifier: workspace:*
         version: link:packages/cli
+      '@jsx2md/gfm':
+        specifier: workspace:*
+        version: link:packages/gfm
       '@jsx2md/github':
         specifier: workspace:*
         version: link:packages/github
@@ -59,9 +62,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@jsx2md/github':
-        specifier: workspace:*
-        version: link:../github
       '@jsx2md/migrate':
         specifier: workspace:*
         version: link:../migrate
@@ -77,6 +77,12 @@ importers:
 
   packages/core: {}
 
+  packages/gfm:
+    dependencies:
+      jsx2md:
+        specifier: workspace:*
+        version: link:../core
+
   packages/github:
     dependencies:
       jsx2md:
@@ -85,9 +91,9 @@ importers:
 
   packages/migrate:
     dependencies:
-      '@jsx2md/github':
+      '@jsx2md/gfm':
         specifier: workspace:*
-        version: link:../github
+        version: link:../gfm
       jsx2md:
         specifier: workspace:*
         version: link:../core

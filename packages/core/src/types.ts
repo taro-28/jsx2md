@@ -2,6 +2,8 @@ export const elementSymbol = Symbol.for("jsx2md.element");
 
 export type AdapterName = "markdown" | "gfm" | "github";
 
+export type UnsupportedBehavior = "error" | "omit" | "plain";
+
 export type AdapterFeature =
   | "gfm"
   | "github"
@@ -29,11 +31,11 @@ export type ElementType<Props extends object = Record<string, unknown>> = string
 
 export interface MarkdownElement {
   readonly [elementSymbol]: true;
-  readonly type: string | Component<Record<string, unknown>>;
+  readonly type: string | Component;
   readonly props: Readonly<Record<string, unknown>> & {
     readonly children?: MarkdownChildren;
   };
-  readonly key: string | number | null;
+  readonly key: string | number | undefined;
 }
 
 export interface ComponentContext {
@@ -42,6 +44,7 @@ export interface ComponentContext {
   readonly renderBlock: (node: MarkdownNode) => string;
   readonly renderInline: (node: MarkdownNode) => string;
   readonly requireAdapter: (feature: AdapterFeature, componentName: string) => void;
+  readonly unsupported: UnsupportedBehavior;
 }
 
 export type Component<Props extends object = Record<string, unknown>> = (
@@ -53,6 +56,7 @@ export type Component<Props extends object = Record<string, unknown>> = (
 
 export interface RenderOptions {
   readonly adapter?: Adapter | AdapterName;
+  readonly unsupported?: UnsupportedBehavior;
 }
 
 export interface CommonProps {
@@ -63,7 +67,7 @@ export interface HeadingElementProps extends CommonProps {
   readonly id?: string;
 }
 
-export interface ParagraphProps extends CommonProps {}
+export type ParagraphProps = CommonProps;
 
 export interface ListProps extends CommonProps {
   readonly start?: number;
@@ -73,7 +77,7 @@ export interface ListItemProps extends CommonProps {
   readonly checked?: boolean;
 }
 
-export interface BlockquoteProps extends CommonProps {}
+export type BlockquoteProps = CommonProps;
 
 export interface CodeProps extends CommonProps {
   readonly lang?: string;
@@ -99,10 +103,34 @@ export interface RawMarkdownProps {
   readonly children: string;
 }
 
+export type AdmonitionVariant = "caution" | "important" | "note" | "tip" | "warning";
+
+export interface AdmonitionProps extends CommonProps {
+  readonly title?: MarkdownChildren;
+  readonly variant: AdmonitionVariant;
+}
+
 export interface SectionProps extends CommonProps {
   readonly title?: MarkdownChildren;
 }
 
 export interface AutoHeadingProps extends CommonProps {
   readonly level?: number;
+}
+
+export interface DetailsProps extends CommonProps {
+  readonly open?: boolean;
+  readonly summary: MarkdownChildren;
+}
+
+export interface FenceProps {
+  readonly children: string;
+}
+
+export interface KbdProps {
+  readonly children: string;
+}
+
+export interface AnchorProps {
+  readonly id: string;
 }

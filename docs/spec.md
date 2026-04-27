@@ -9,6 +9,7 @@
 The repository is a pnpm monorepo:
 
 - `packages/core` publishes `jsx2md`.
+- `packages/gfm` publishes `@jsx2md/gfm`.
 - `packages/github` publishes `@jsx2md/github`.
 - `packages/migrate` publishes `@jsx2md/migrate`.
 - `packages/cli` publishes `@jsx2md/cli` and the `jsx2md` binary.
@@ -25,7 +26,18 @@ render(node, options);
 
 The renderer accepts JSX nodes created by the custom JSX runtime and returns a Markdown string. It also exports runtime helpers for non-JSX usage.
 
-TSX usage is enabled with:
+Projects usually enable TSX usage once in `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}
+```
+
+Standalone TSX entries can instead use a per-file pragma:
 
 ```tsx
 /** @jsxImportSource jsx2md */
@@ -33,11 +45,13 @@ TSX usage is enabled with:
 
 ## Components
 
-Core components cover portable Markdown building blocks: documents, fragments, raw Markdown, headings, sections, paragraphs, lists, block quotes, inline code, fenced code, links, images, tables, rules, and line breaks.
+Core components cover portable Markdown building blocks: documents, fragments, raw Markdown, headings, sections, paragraphs, lists, block quotes, inline code, fenced code, links, images, tables, rules, line breaks, details blocks, keyboard tags, anchors, diagrams rendered as fences, and semantic admonitions.
 
 `Section` and `Heading` support automatic heading depth. Rendering fails when automatic depth would exceed `h6`.
 
-GitHub components live in `@jsx2md/github` and cover GitHub alerts, task lists, details blocks, suggestions, code fences, diagrams, references, mentions, footnotes, colors, emoji, keyboard tags, anchors, and strikethrough text.
+GFM components live in `@jsx2md/gfm` and cover task lists, footnotes, and strikethrough text.
+
+GitHub components live in `@jsx2md/github` and cover GitHub alerts, suggestions, references, mentions, colors, emoji, and GitHub-specific diagrams.
 
 ## Adapters
 
@@ -47,7 +61,7 @@ Adapters describe output capabilities:
 - `gfm`: GitHub Flavored Markdown.
 - `github`: GitHub Markdown for repositories, issues, pull requests, and comments.
 
-GitHub-only components must throw clear errors when rendered with an adapter that does not support them.
+Unsupported syntax throws clear errors by default. Users can opt in to `unsupported: "plain"` for readable fallback output or `unsupported: "omit"` to remove unsupported wrappers while preserving child content.
 
 ## CLI
 
@@ -55,9 +69,11 @@ The CLI supports:
 
 ```sh
 jsx2md render <entry.tsx> -o README.md --adapter github --props props.json
+jsx2md render <entry.tsx> --adapter markdown --unsupported plain
 jsx2md render <entry.tsx>
 jsx2md check <entry.tsx> -o README.md
 jsx2md migrate <input.md> -o <output.tsx> --adapter github
+jsx2md migrate <input.md> -o <output.tsx> --adapter github --no-pragma
 ```
 
 TSX entries should default-export either a JSX node or a function that receives JSON props.
@@ -65,6 +81,8 @@ TSX entries should default-export either a JSX node or a function that receives 
 ## Migration
 
 Migration converts Markdown to TSX using mdast. It prioritizes semantic preservation over byte-for-byte formatting. Unknown nodes and embedded HTML are preserved through a raw Markdown escape hatch so conversion does not silently drop content.
+
+Generated TSX includes JSX runtime pragma comments by default so migrated files work as standalone CLI entries. Users can pass `pragma: false` to `migrateMarkdown()` or `--no-pragma` to the CLI when their project already configures `jsxImportSource`.
 
 ## Standards
 

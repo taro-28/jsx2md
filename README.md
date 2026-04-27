@@ -14,10 +14,33 @@ pnpm install
 pnpm build
 ```
 
-## Programmatic API
+## JSX Runtime Setup
+
+Most projects should configure the JSX runtime once in `tsconfig.json`. Per-file pragma comments are useful for standalone TSX entries and generated migration output, but they are not required when the project config already points JSX at `jsx2md`.
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx2md"
+  }
+}
+```
 
 ```tsx
 /** @jsxImportSource jsx2md */
+import { Doc } from "jsx2md";
+
+export default (
+  <Doc>
+    <h1>Standalone entry</h1>
+  </Doc>
+);
+```
+
+## Programmatic API
+
+```tsx
 import { Doc, render } from "jsx2md";
 
 const markdown = render(
@@ -33,15 +56,25 @@ const markdown = render(
 ```sh
 jsx2md render docs/readme.tsx -o README.md --adapter github
 jsx2md render docs/readme.tsx --adapter github
+jsx2md render docs/readme.tsx --adapter markdown --unsupported plain
 jsx2md check docs/readme.tsx -o README.md --adapter github
 jsx2md migrate README.md -o docs/readme.tsx --adapter github
+jsx2md migrate README.md -o docs/readme.tsx --adapter github --no-pragma
 ```
 
 Exit codes:
 
 - `render`: `0` when Markdown is generated, `1` on load or render errors.
 - `check`: `0` when output matches, `1` when output differs or an error occurs. Mismatches print a unified diff.
-- `migrate`: `0` when TSX is generated, `1` on read, parse, or write errors. Preservation diagnostics are printed to stderr.
+- `migrate`: `0` when TSX is generated, `1` on read, parse, or write errors. Preservation diagnostics are printed to stderr. Generated TSX includes JSX pragma comments by default; pass `--no-pragma` when your project already configures `jsxImportSource`.
+
+## Adapters
+
+- `markdown`: CommonMark-oriented Markdown with raw HTML support.
+- `gfm`: GitHub Flavored Markdown features such as tables, task lists, strikethrough, and footnotes.
+- `github`: GitHub.com syntax for repositories, issues, pull requests, and comments.
+
+Unsupported syntax throws by default. Pass `unsupported: "plain"` or `unsupported: "omit"` only when fallback output is intentional.
 
 ## Generated README
 
@@ -54,12 +87,13 @@ pnpm docs:check
 
 ## Packages
 
-| Package           | Purpose                                                        |
-| ----------------- | -------------------------------------------------------------- |
-| `jsx2md`          | Core renderer, JSX runtime, Markdown components, and adapters. |
-| `@jsx2md/github`  | GitHub Markdown adapter and GitHub-only components.            |
-| `@jsx2md/migrate` | Markdown to TSX migration utilities.                           |
-| `@jsx2md/cli`     | The `jsx2md` command for render, check, and migrate workflows. |
+| Package           | Purpose                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `jsx2md`          | Core renderer, JSX runtime, CommonMark components, and adapters. |
+| `@jsx2md/gfm`     | GitHub Flavored Markdown components.                             |
+| `@jsx2md/github`  | GitHub-specific components.                                      |
+| `@jsx2md/migrate` | Markdown to TSX migration utilities.                             |
+| `@jsx2md/cli`     | The `jsx2md` command for render, check, and migrate workflows.   |
 
 ## Examples
 
