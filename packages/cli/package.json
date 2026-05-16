@@ -41,7 +41,7 @@
     "@jsx2md/migrate": "workspace:*",
     "commander": "14.0.3",
     "jsx2md": "workspace:*",
-    "tsx": "4.21.0"
+    "tsx": "4.22.0"
   },
   "engines": {
     "node": ">=22.0.0"
